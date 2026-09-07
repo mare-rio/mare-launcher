@@ -1,6 +1,6 @@
 # CI and contributor trust
 
-The prepared workflow runs tests and builds an **unsigned** APK on GitHub-hosted runners. It has no signing, publishing or deployment job. Publication of this candidate is on hold; the settings below are requirements to check before creating a public repository, not a claim that they have already been applied.
+The workflow runs tests and builds an **unsigned** APK on GitHub-hosted runners. It has no signing, publishing or deployment job. Source is published separately from installable releases, which remain on hold pending signing and release validation.
 
 ## What malicious code can access
 
@@ -20,15 +20,16 @@ Ordinary fork pull-request workflows do not receive Actions secrets; their `GITH
 
 The policy test catches accidental drift in this workflow. A malicious contributor can change tests too; required human review and repository settings remain essential. SHA pinning prevents an action tag from moving but does not make the pinned code inherently trustworthy.
 
-## Settings required before publication
+## Repository protection policy
 
 1. **Actions secrets:** keep this repository outside every organisation-secret selection, and add no repository or environment secrets. Audit organisation visibility before creation. Secrets shared with all private repositories can reach a newly created private staging repository; “private” is not a CI isolation control.
 2. **Runners:** retain the organisation rule that excludes public repositories from self-hosted runner groups. Use GitHub-hosted runners for this project.
 3. **Workflow permissions:** read-only. Disable the option allowing Actions to create or approve pull requests. Do not send write tokens or secrets to fork workflows.
 4. **Fork approval:** require approval for all outside contributors’ workflow runs. Approval is permission to execute code; inspect changes before approving.
-5. **Branch protection/rulesets:** require pull requests, required checks and CODEOWNER review for `main`; dismiss stale reviews and require review of the latest push. Review direct-push and administrator bypass rights deliberately.
+5. **Branch protection/rulesets:** require pull requests, required checks and CODEOWNER review for `main`; dismiss stale reviews and require review of the latest push. The maintainer, `@danielcavalli`, may bypass the review rule through a pull request to handle owner-authored changes in this single-maintainer project. A separate ruleset requires the Linux, Windows, macOS and Android checks and protects branch history, with no bypass actors. The initial creation of `main` is exempt from required checks; later changes must pass them. The owner exception does not permit direct pushes or skipping CI.
 6. **Review ownership:** `.github/CODEOWNERS` names the maintainer for all files. This is enforced only after the matching ruleset requires code-owner approval. Review scripts, lockfiles and vendored assets as well as workflow files.
-7. **Action policy:** allow required actions only and enforce full-SHA pinning where available. Keep secret scanning and push protection enabled where supported.
+7. **Action policy:** enforce full-SHA pinning. The organisation's selected-action policy is inherited; GitHub does not permit a narrower repository allowlist under the current parent policy. This workflow uses only the four reviewed GitHub-owned action versions pinned in `.github/workflows/ci.yml`. Keep secret scanning and push protection enabled where supported.
+8. **Security reporting:** keep private vulnerability reporting enabled. The launcher's own enforced security configuration enables it together with secret scanning, push protection and Dependabot alerts and security updates.
 
 Inspect inherited organisation settings again before switching a repository between private and public. Do not copy another Maré application’s deployment pipeline into this project.
 

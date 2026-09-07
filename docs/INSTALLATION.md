@@ -1,6 +1,6 @@
 # Install Maré over your home network
 
-These instructions accompany the complete installation ZIP. The current candidate is local and has not been published. Download instructions will be added when the owner approves a public release.
+These instructions accompany the complete installation ZIP. The source is public, but an installable release has not been published yet. Download instructions will be added with the first reviewed release.
 
 ## Before you start
 

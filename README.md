@@ -6,7 +6,7 @@ Maré is an ad-free launcher for Android TV and Google TV. Pin up to twelve favo
 
 ![Maré home in the night appearance, with demonstration apps](docs/images/home-night.png)
 
-**Release status: local 0.3.0 candidate. Publication is on hold pending the owner’s CI security and signing review. No public download is available yet.** The instructions below describe the prepared installation bundle.
+**Release status: source available; 0.3.0 is a prerelease candidate. No installable release has been published yet.** Signing and release validation are still in progress. The instructions below describe the prepared installation bundle; developers can [build from source](docs/BUILDING.md).
 
 ## Install on your TV
 

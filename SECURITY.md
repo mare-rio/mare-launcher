@@ -4,6 +4,6 @@ Maré loads its bundled interface from a fixed local asset origin. It does not r
 
 The network ADB installer changes the active profile’s launcher selection and, only with explicit fallback selection, supported Google Home package states. Keep its recovery record. Enable debugging only on a trusted network and turn it off after installation.
 
-The initial candidate is unpublished. Before publication, reports should go directly to the project owner through an established private contact. Once a public repository exists and private vulnerability reporting is enabled, use its **Security → Report a vulnerability** form. Do not post credentials, pairing codes, private device inventories or signing material in a public issue.
+Report vulnerabilities through the repository’s private [Security → Report a vulnerability](https://github.com/mare-rio/mare-launcher/security/advisories/new) form. Do not post credentials, pairing codes, private device inventories or signing material in a public issue.
 
 Describe the affected revision, Android/WebView versions, reproduction steps and impact. Redact device identifiers and addresses. For CI risks, see the [contributor trust and CI design](docs/CI_SECURITY.md).

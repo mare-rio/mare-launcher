@@ -55,7 +55,7 @@ Dependencies are pinned, but byte-for-byte reproducibility of APK ZIP timestamps
 
 ## Separate local signing
 
-Publication is currently on hold. Do not upload a keystore or password to Actions. Choose and back up the long-term signing identity before the first public release; Android updates depend on retaining it. Existing private previews have a separate signing history that must be considered before public rollout.
+Installable releases are currently on hold; source publication does not include signing keys or a downloadable APK. Do not upload a keystore or password to Actions. Choose and back up the long-term signing identity before the first public release; Android updates depend on retaining it. Existing private previews have a separate signing history that must be considered before public rollout.
 
 Use a trusted copy of the signing helper and Android SDK in a signing environment that does not execute contributor build code. Transfer the reviewed unsigned APK with its matching `release.json`; independently record the approved unsigned SHA-256. Set `MARE_KEYSTORE_PASSWORD` privately in that environment, then run:
 
