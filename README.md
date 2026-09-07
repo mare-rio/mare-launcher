@@ -14,7 +14,7 @@ The guided installer sets Maré as the screen your TV opens when you press **Hom
 
 1. **[Download the installer ZIP](https://github.com/mare-rio/mare-launcher/releases/latest/download/mare-launcher-install.zip)** and extract it.
 2. In the extracted folder, run **`sh install.sh`** on macOS/Linux, or **`.\install.cmd`** in Windows Terminal. You need [Python 3.9 or newer](https://www.python.org/downloads/).
-3. The terminal walks you through the TV settings, connection and installation. Follow its prompts, then press **Home** on your remote. In Maré, open **Apps**, hold **OK** on an app and choose **Pin to home**.
+3. Follow the terminal instructions to enable debugging on the TV, then enter the **TV IP address**. Setup finds the connection automatically and guides any authorization needed. After installation, press **Home** on your remote. In Maré, open **Apps**, hold **OK** on an app and choose **Pin to home**.
 
 [Read the installation guide](docs/INSTALLATION.md) · [Install just the APK](docs/INSTALLATION.md#install-just-the-apk) · [Release notes](https://github.com/mare-rio/mare-launcher/releases/latest)
 

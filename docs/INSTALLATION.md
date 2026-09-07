@@ -18,34 +18,12 @@ Extract the whole ZIP into a folder on your computer. Do not run the installer f
 2. Look under **System → About** or **Device Preferences → About**.
 3. Find **Android TV OS build**, **Build** or **Build number**. Select it seven times until the TV says developer mode is enabled. Enter your TV’s PIN if asked.
 4. Return to System or Device Preferences and open **Developer options**.
-5. Use the applicable connection method below. Menu names depend on the manufacturer. If the TV is managed by a school, hotel or employer, its administrator may have disabled debugging or launcher replacement.
+5. Turn on **Network debugging** or **ADB debugging**. On many TCL Android TVs, the switch is called **USB debugging**: enable it even though the installer connects through your home network.
+6. If the TV offers **Wireless debugging** instead, enable it and allow your home network. Keep that screen open. The installer will handle the connection and request authorization when needed.
 
 Do not enable OEM unlocking. Installing a launcher does not require unlocking or erasing the TV.
 
-### TVs with Wireless debugging and a pairing code
-
-Android’s documented wireless pairing support for **TV starts with Android 13**. Some manufacturers differ; use the controls actually present on your TV.
-
-1. Enable **Wireless debugging** and allow it on your home network.
-2. On its main screen, note the **IP address and port**. This is the **connection address**.
-3. Start the computer installer. Answer **y** only if you can open **Pair device with pairing code** on the TV. Enter the connection address as `IP:port`, or enter just the IP and setup asks for the connection port separately.
-4. On the TV choose **Pair device with pairing code**. Keep that screen open.
-5. Enter the **pairing address** shown there when the installer requests it (the IP and port can also be entered separately), then the six-digit code. The code is entered privately and is not saved.
-
-The pairing port and connection port are different. Pairing authorises your computer; the main-screen address is where it then connects. If the TV closes the pairing screen or the code expires, open a new one and rerun setup. On later updates you normally need only the current connection address.
-
-### TVs with Network / ADB debugging
-
-Many Android 11 televisions expose network ADB through **Network debugging**, **ADB debugging**, or a vendor switch labelled **USB debugging**.
-
-1. Enable the applicable debugging switch.
-2. Find the TV’s IP address under **Network → your connection**, or **About → Status**.
-3. Answer **n** to the pairing-code question, then enter the IP in the installer. If the TV shows a port, enter `IP:port`; otherwise the installer tries the usual port `5555`.
-4. Accept **Allow debugging?** on the TV for your computer. You can select **Always allow** on a computer you trust.
-
-USB debugging alone does **not** turn on network access on all models. If the connection is refused and the TV has no network option, see the troubleshooting section. The installer cannot create a debugging connection that the firmware does not expose.
-
-If you chose the wrong method, type **back** at any address or port prompt. Setup lets you choose again without restarting. A TV connected through Wi-Fi can still use the Network / ADB / USB debugging method; choose according to the controls on the TV.
+The menu names depend on the TV's firmware. Some TCL models make network ADB available through the USB debugging switch; others require a dedicated network setting. If the TV does not answer after you enable debugging, setup provides connection help. A school, hotel or employer may restrict these settings on a managed TV.
 
 ## 2. Run the guided installer
 
@@ -59,7 +37,13 @@ The terminal shows a setup menu, numbered steps, a panel identifying the connect
 
 The installer finds ADB if it is already installed. Otherwise it offers a pinned download from Google and displays Google’s SDK licence before asking you to accept it. It verifies the archive’s SHA-256 before extraction. On ARM Linux, install the distribution’s native `adb` package instead.
 
-Choose **1 — Install or update Maré**, or just press Enter. Setup asks you how to connect to the TV; type **y** for yes or press Enter for no. If the TV asks **Allow debugging?**, accept it with your remote.
+Choose **1 — Install or update Maré**, or just press Enter. Choose **4** to check the connection first.
+
+On the TV, find **IP address** in **Settings → Network & Internet → your connected Wi-Fi or Ethernet network**, or **About → Status**. Enter that IP when setup asks **TV IP address:**. You do not need to choose a connection method or know an ADB port.
+
+Setup tries the usual network connection and discovers any advertised connection ports for that IP. If the TV asks **Allow debugging?**, accept with your remote, then press Enter on the computer. On a TV that needs a pairing code, setup tells you when to open **Wireless debugging → Pair device with pairing code**. Keep that TV screen open, press Enter on the computer, then enter the six-digit code privately when prompted. Setup finds the ports and connects.
+
+If a connection fails, setup lets you retry after enabling debugging or enter a corrected IP without restarting. When the network prevents automatic discovery, it explains how to copy the needed port from the TV as a fallback. It only connects to the IP you entered.
 
 After connecting, it prints the TV model, Android version, active profile and current launcher. Check that these describe the TV you intend to change, then accept the installation plan. It saves the original Home selection before making changes and installs Maré without clearing existing app data. Do not close the computer terminal until setup finishes.
 
@@ -133,7 +117,10 @@ Keep the JSON file. It contains the previous Home and affected package states, n
 
 | What you see | What to do |
 | --- | --- |
-| Your IP is accepted, but setup asks for a port you cannot find | Type **back** and answer **n** if the TV only has a Network / ADB / USB debugging switch. Enter the IP again; setup uses port `5555`. For pairing-code Wireless debugging, use the port printed after the colon on the TV. |
+| The TV has not connected yet | Check debugging, the TV IP and the home network, then press Enter to retry. You can enter a corrected IP at the same prompt. |
+| The TV shows a pairing code, but setup has not detected it | At the connection-help prompt, type **pair**. Keep the pairing-code screen open; setup tries discovery again before asking for any port. |
+| Automatic discovery cannot find a pairing port | Copy the number after the colon under **IP address & port** on the TV's pairing-code screen. The installer retains the TV IP; enter only that port. Type **back** to return to connection checks. |
+| Pairing succeeds, but automatic discovery cannot find the connection port | Close the TV's pairing-code screen. Copy the port from the **main Wireless debugging screen** when asked. Its port is different from the pairing port. |
 | Connection refused / timed out | Check the current IP, correct port, TV awake, debugging enabled and guest-network isolation. A VPN or firewall on the computer may block local access. |
 | `unauthorized` | Accept the TV’s debugging prompt. If it never appears, revoke debugging authorisations in Developer options and reconnect; this also revokes other trusted computers. |
 | Pairing succeeds but connection fails | Use the connection port on the main Wireless debugging screen, not the pairing port. |
@@ -142,6 +129,8 @@ Keep the JSON file. It contains the previous Home and affected package states, n
 | HDMI/tuner is missing or will not open | Use the physical Input/Source or Live TV button. Some manufacturers do not expose usable standard input intents. |
 | Home resets after a firmware update | Re-enable debugging and rerun installation; retain the recovery file. |
 | UI looks soft on a 4K panel | Some TVs render Android’s whole interface at 1080p. A launcher cannot raise a protected manufacturer compositor limit; changing font size or ADB density does not prove 4K output. |
+
+Android's documented pairing-code Wireless debugging support for **TV starts with Android 13**; vendor support varies. Its ports are advertised through mDNS, which some networks block. Network / ADB / vendor USB debugging commonly uses port 5555. The installer handles these details automatically where the TV and network expose them. See [Android's ADB guide](https://developer.android.com/tools/adb) and [ADB wireless discovery](https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/docs/dev/adb_wifi.md).
 
 ## Advanced commands
 
