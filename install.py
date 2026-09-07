@@ -268,7 +268,7 @@ def load_state(path, info):
 def verify_apk(apk):
     manifest = apk.parent / 'release.json'
     if not apk.is_file() or not manifest.is_file():
-        raise InstallError('Use the complete Maré installation ZIP: the APK and release.json must be together. See README.md.')
+        raise InstallError('Use the complete Maré installation ZIP: the APK and release.json must be together. Open START_HERE.html.')
     info = json.loads(manifest.read_text(encoding='utf-8'))
     if info.get('package') != PACKAGE or info.get('apk') != apk.name or not info.get('signed'):
         raise InstallError('This is not a signed Maré installation bundle.')
@@ -305,13 +305,13 @@ def restore(adb, info, state_path, remove=False):
     print('Previous Home and any Google Home packages changed by this installer are restored.')
 
 
-def install(adb, info, apk, state_path, keep_home=False, replace_stock=False):
+def install(adb, info, apk, state_path, keep_home=False, replace_stock=False, guided=False):
     release = verify_apk(apk)
     if info['api'] < release['minSdk']:
         raise InstallError('This release needs a newer Android version.')
     saved = load_state(state_path, info)
     if saved and saved['phase'] in ('restoring', 'recovery-needed'):
-        raise InstallError('An earlier operation needs recovery. Run the restore command first.')
+        raise InstallError('An earlier operation needs recovery. Open setup and choose Restore first, or use the restore command.')
     if not keep_home and not (saved['previous_home'] if saved and saved['phase'] != 'restored' else info['home']):
         raise InstallError('Choose a default Home in TV settings first so it can be restored later, or use --keep-home.')
     if not saved or saved['phase'] == 'restored':
@@ -339,6 +339,11 @@ def install(adb, info, apk, state_path, keep_home=False, replace_stock=False):
                 raise InstallError('Choose a default Home in TV settings first so it can be restored later, or use --keep-home.')
             adb.shell('cmd', 'package', 'set-home-activity', '--user', info['user'], HOME)
             if not home_is_running(adb, info['user']):
+                if guided and not replace_stock:
+                    print('\nYour TV keeps opening Google Home instead of Maré.')
+                    print('Setup can turn off Google Home and its launcher setup companion for this profile.')
+                    print('Your streaming apps stay installed. You can turn Google Home back on by running setup again and choosing Restore.')
+                    replace_stock = confirm('Allow setup to turn off Google Home if it is present?')
                 if not replace_stock:
                     raise InstallError('This TV did not keep Maré as Home. Recovery is being applied. '
                                        'If it uses Google TV Home, you may rerun with --replace-stock-home; see docs/INSTALLATION.md.')
@@ -358,7 +363,7 @@ def install(adb, info, apk, state_path, keep_home=False, replace_stock=False):
                     raise InstallError('Firmware still overrides Home; restoring the prior configuration.')
         saved['phase'] = 'complete'
         atomic_json(state_path, saved)
-    except (InstallError, KeyboardInterrupt):
+    except (InstallError, KeyboardInterrupt, EOFError):
         try:
             restore(adb, info, state_path)
         except (InstallError, KeyboardInterrupt) as error:
@@ -372,8 +377,29 @@ def install(adb, info, apk, state_path, keep_home=False, replace_stock=False):
     print('You can now turn debugging off on the TV. Turn it on again for updates or recovery.')
 
 
-def wizard():
+def choose_action():
     print('Maré Launcher — guided setup\n')
+    print('1. Install or update Maré (press Enter)')
+    print('2. Restore my previous Home screen')
+    print('3. Restore my previous Home screen and remove Maré')
+    print('4. Check my TV connection without changing anything')
+    while True:
+        choice = input('Choose 1–4: ').strip() or '1'
+        if choice in ('1', '2', '3', '4'):
+            return {'1': 'install', '2': 'restore', '3': 'restore', '4': 'doctor'}[choice], choice == '3'
+        print('Type 1, 2, 3 or 4, then press Enter.')
+
+
+def ask_endpoint(prompt, default_port=5555):
+    while True:
+        try:
+            return endpoint(input(prompt), default_port)
+        except InstallError as error:
+            print(str(error) + ' Try again, or press Ctrl+C to cancel.')
+
+
+def wizard():
+    print('\nConnect your TV\n')
     print('Keep the TV and this computer on the same trusted home network.')
     print('TV: Settings > System (or Device Preferences) > About > Android TV OS build.')
     print('Press OK on the build seven times. Go back and open Developer options.')
@@ -381,19 +407,19 @@ def wizard():
     pairing = confirm('Does the TV have Wireless debugging with a “Pair device with pairing code” option?')
     if pairing:
         print('Enable Wireless debugging. First note the connection address on its MAIN screen.')
-        target = endpoint(input('IP address and connection port: '), None)
+        target = ask_endpoint('IP address and connection port: ', None)
         print('Now open Pair device with pairing code and KEEP that screen open.')
-        pair = endpoint(input('IP address and pairing port from the pairing screen: '), None)
+        pair = ask_endpoint('IP address and pairing port from the pairing screen: ', None)
         return target, pair
     print('Enable Network debugging (sometimes called ADB debugging). Some TVs use a switch named USB debugging.')
     print('Find the TV IP under Network > your connection, or About > Status.')
     print('USB debugging alone does not enable network ADB on every TV. See the guide if connection is refused.')
-    return endpoint(input('TV IP address (or IP:port): ')), None
+    return ask_endpoint('TV IP address (or IP:port): '), None
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', nargs='?', choices=['install', 'restore', 'doctor'], default='install')
+    parser.add_argument('action', nargs='?', choices=['install', 'restore', 'doctor'])
     device = parser.add_mutually_exclusive_group()
     device.add_argument('--target', help='TV network IP[:connection port]')
     device.add_argument('--serial', help='Explicit already-connected USB or emulator serial (advanced)')
@@ -408,6 +434,11 @@ def main(argv=None):
     parser.add_argument('--remove', action='store_true', help='With restore, also uninstall Maré for this profile')
     parser.add_argument('--dry-run', action='store_true', help='Connect and inspect; make no TV configuration or package changes')
     args = parser.parse_args(argv)
+    guided = not (args.target or args.serial)
+    if guided and sys.stdin.isatty() and args.action is None:
+        args.action, remove = choose_action()
+        args.remove = args.remove or remove
+    args.action = args.action or 'install'
     if args.remove and args.action != 'restore':
         parser.error('--remove is only valid with restore')
     if args.pair and not args.target:
@@ -449,7 +480,7 @@ def main(argv=None):
         print('Cancelled; no TV changes made.')
         return
     if args.action == 'install':
-        install(adb, info, apk.resolve(), state_path, args.keep_home, args.replace_stock_home)
+        install(adb, info, apk.resolve(), state_path, args.keep_home, args.replace_stock_home, guided=guided)
     else:
         restore(adb, info, state_path, args.remove)
 

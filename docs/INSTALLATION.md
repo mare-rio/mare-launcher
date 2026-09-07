@@ -1,12 +1,14 @@
 # Install Maré over your home network
 
-These instructions accompany the complete installation ZIP. The source is public, but an installable release has not been published yet. Download instructions will be added with the first reviewed release.
+Use this guide for **TCL Android TV and Google TV**, or another compatible Android TV. You do not need to build software, unlock the TV or use the Play Store to install Maré. TCL Roku TVs use a different operating system and cannot install this APK.
+
+**[Download the guided installer ZIP](https://github.com/mare-rio/mare-launcher/releases/latest/download/mare-launcher-install.zip)**, right-click it and choose **Extract All** on Windows, or double-click it on macOS. On Linux, use your file manager’s Extract option. Open **START_HERE.html** in the extracted folder for the short walkthrough.
 
 ## Before you start
 
 Use a Windows, macOS or Linux computer on the same trusted home network as the TV. Ethernet and Wi-Fi can be mixed if your router lets the devices talk to each other. Guest Wi-Fi often blocks this connection. Keep the TV awake and its remote nearby.
 
-Install **Python 3.9 or later** from [python.org](https://www.python.org/downloads/) if it is missing. On Windows enable the installer’s PATH option. On Linux your distribution’s Python package is suitable. No Python packages are needed.
+Install **Python 3.9 or later** from [python.org](https://www.python.org/downloads/) if it is missing. On Windows choose the Python install manager, open it and follow its instructions to install Python 3. If you use the traditional installer, enable **Add python.exe to PATH**. On macOS open the downloaded `.pkg` and follow its installer. On Linux your distribution’s Python package is suitable. No Python packages are needed.
 
 Extract the whole ZIP into a folder on your computer. Do not run the installer from inside the compressed ZIP or copy out only the APK. The adjacent `release.json` lets it check the APK’s integrity. A checksum detects changed files; obtain both the bundle and its checksum from a trusted release source.
 
@@ -53,6 +55,8 @@ USB debugging alone does **not** turn on network access on all models. If the co
 
 The installer finds ADB if it is already installed. Otherwise it offers a pinned download from Google and displays Google’s SDK licence before asking you to accept it. It verifies the archive’s SHA-256 before extraction. On ARM Linux, install the distribution’s native `adb` package instead.
 
+Choose **1 — Install or update Maré**, or just press Enter. Setup asks you how to connect to the TV; type **y** for yes or press Enter for no. If the TV asks **Allow debugging?**, accept it with your remote.
+
 After connecting, it prints the TV model, Android version, active profile and current launcher. Check that these describe the TV you intend to change, then accept the installation plan. It saves the original Home selection before making changes and installs Maré without clearing existing app data. Do not close the computer terminal until setup finishes.
 
 Press **Home** on the TV. The installer checks that Maré becomes the foreground Home app. Open **Apps**, hold **OK** on an app and choose **Pin to home**. Repeat for your favourites; up to twelve fit on Home. Streaming apps such as SmartTube or Stremio are installed separately and are not bundled.
@@ -61,9 +65,11 @@ Turn debugging off after setup. Maré runs locally and does not need ADB or your
 
 ## If the TV keeps opening Google Home
 
-First try the TV’s own **Default apps → Home app** setting, if present. Some TV firmware reports success for Android’s Home command but continues to open its preinstalled launcher. In that case the installer restores the previous configuration and explains what happened.
+Guided setup detects this and asks whether it may **turn off Google Home** for your TV profile. Answer **y** to let Maré take over. Google Home is still stored on the TV, your streaming apps stay installed, and setup saves how to turn it back on. If you decline, setup restores your previous Home.
 
-The following optional command allows it to disable supported Google Home packages **only if normal selection fails**:
+If your TV has a **Default apps → Home app** setting, you can also choose Maré there. Some firmware restricts launcher replacement entirely; setup restores the previous configuration if its supported fallback cannot make Maré the default.
+
+For people using the command line, the equivalent option is:
 
 ```sh
 python3 install.py --target 192.0.2.10 --replace-stock-home
@@ -73,15 +79,29 @@ Replace `192.0.2.10` with your TV’s address; on Windows use `py -3`. This opti
 
 There is no general manufacturer-package removal list. If the fallback still fails, setup attempts recovery and leaves Maré installed. Use `--keep-home` to try Maré as a normal app while keeping the current default. Do not disable TV input, settings, update, account or playback services to force a launcher change.
 
+## Install just the APK
+
+**[Download mare-launcher.apk](https://github.com/mare-rio/mare-launcher/releases/latest/download/mare-launcher.apk)** if you already install APKs on your TV, or prefer using a USB stick:
+
+1. Copy the APK onto a USB stick your TV can read and plug it into the TV.
+2. Open a TV file manager, find the USB stick and open **mare-launcher.apk**. If your TV has no file manager, you will need to install one separately.
+3. If Android asks for permission to install unknown apps, open the offered **Settings**, allow your file manager to install apps, then return and open the APK again. The location of this switch varies by TV.
+4. Choose **Install**, then **Open**. You can turn that file manager’s installation permission off afterwards.
+5. If the TV offers a Home-app chooser, select **Maré Launcher → Always**. Otherwise use **Settings → Apps → Default apps → Home app**, if available.
+
+Opening the APK installs Maré; some TCL models need the **guided network installer** to make it the default Home screen. If pressing Home still opens Google TV, use the ZIP instructions above. The same APK is in both downloads. Existing users can install the latest APK over their current copy to keep favourites and settings.
+
 ## Updates
 
-Extract the new reviewed bundle and run its installer against the same TV. It uses an in-place Android update and keeps favourites and settings. Keep using the same computer or copy its recovery file to the new computer and pass `--state path/to/file.json`.
+Download and extract the latest installer ZIP, run setup and choose **1 — Install or update Maré** for the same TV. It uses an in-place Android update and keeps favourites and settings. Keep using the same computer or copy its recovery file to the new computer and pass `--state path/to/file.json`.
 
 Android requires the same signing identity and a compatible version code for an update. `INSTALL_FAILED_UPDATE_INCOMPATIBLE` usually means a different signing key; `INSTALL_FAILED_VERSION_DOWNGRADE` means an older build. The installer will not uninstall your copy to work around either error. Development builds use their own key and do not upgrade production builds.
 
 ## Restore and remove
 
-Enable the TV’s debugging connection again. In the extracted folder run:
+Enable debugging on the TV again. Open the same installer on the same computer and choose **2 — Restore my previous Home screen**. Choose **3** instead to restore Home and also remove Maré and its settings. No commands are needed.
+
+For command-line use, in the extracted folder run:
 
 ```sh
 python3 install.py restore --target 192.0.2.10

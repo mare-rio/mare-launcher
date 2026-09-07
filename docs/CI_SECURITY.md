@@ -1,6 +1,6 @@
 # CI and contributor trust
 
-The workflow runs tests and builds an **unsigned** APK on GitHub-hosted runners. It has no signing, publishing or deployment job. Source is published separately from installable releases, which remain on hold pending signing and release validation.
+The workflow runs tests and builds an **unsigned** APK on GitHub-hosted runners. It has no signing, publishing or deployment job. Installable APKs and installer ZIPs are signed and published locally after release validation; contributor workflows never receive the signing key.
 
 ## What malicious code can access
 

@@ -7,7 +7,7 @@ if not errorlevel 1 (
 ) else (
   where python >nul 2>nul
   if errorlevel 1 (
-    echo Install Python 3.9 or later from python.org. See docs\INSTALLATION.md.
+    echo Install Python 3.9 or later from python.org. Open START_HERE.html for the walkthrough.
     pause
     exit /b 1
   )

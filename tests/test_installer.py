@@ -120,6 +120,42 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(self.adb.packages, before)
         self.assertEqual(self.adb.home, STOCK)
 
+    @patch.object(app, 'home_is_running', side_effect=[False, True])
+    def test_guided_setup_can_replace_google_home_without_extra_command(self, _):
+        before = self.adb.packages.copy()
+        with patch('builtins.input', return_value='y'):
+            self.install(guided=True)
+        self.assertEqual(self.read_state()['phase'], 'complete')
+        app.restore(self.adb, self.info, self.state)
+        self.assertEqual(self.adb.packages, before)
+        self.assertEqual(self.adb.home, STOCK)
+
+    @patch.object(app, 'home_is_running', return_value=False)
+    def test_guided_decline_or_closed_input_restores_home(self, _):
+        for answer in ['', EOFError()]:
+            with self.subTest(answer=type(answer).__name__):
+                before = self.adb.packages.copy()
+                with patch('builtins.input', side_effect=[answer]), self.assertRaises((app.InstallError, EOFError)):
+                    self.install(guided=True)
+                self.assertEqual(self.adb.home, STOCK)
+                self.assertEqual(self.adb.packages, before)
+                self.assertEqual(self.read_state()['phase'], 'restored')
+
+    def test_address_typo_can_be_corrected_in_setup(self):
+        with patch('builtins.input', side_effect=['192.0.2.', '192.0.2.10']):
+            self.assertEqual(app.ask_endpoint('TV address: '), '192.0.2.10:5555')
+
+    def test_guided_restore_menu_dispatches_without_installing(self):
+        with patch.object(app.sys.stdin, 'isatty', return_value=True), patch('builtins.input', side_effect=['2', 'y']), \
+             patch.object(app, 'wizard', return_value=('192.0.2.10:5555', None)), \
+             patch.object(app, 'find_adb', return_value='/adb'), patch.object(app, 'Adb', return_value=self.adb), \
+             patch.object(self.adb, 'connect', create=True), \
+             patch.object(app, 'inspect_tv', return_value={**self.info, 'manufacturer': 'Test', 'model': 'TV', 'webview': ''}), \
+             patch.object(app, 'restore') as restore, patch.object(app, 'install') as install:
+            app.main(['--state', str(self.state)])
+        restore.assert_called_once_with(self.adb, {**self.info, 'manufacturer': 'Test', 'model': 'TV', 'webview': ''}, self.state.resolve(), False)
+        install.assert_not_called()
+
     @patch.object(app, 'home_is_running', return_value=False)
     def test_partial_disable_failure_restores_already_changed_packages(self, _):
         before = self.adb.packages.copy()
