@@ -147,6 +147,33 @@ def endpoint(value, default_port=5555):
     return ('[' + str(address) + ']' if address.version == 6 else str(address)) + ':' + str(number)
 
 
+def endpoint_host(value):
+    return endpoint(value).rsplit(':', 1)[0]
+
+
+def mdns_services(output, target):
+    """Use only numeric service addresses belonging to the requested TV."""
+    services = {'connect': [], 'pair': [], 'wireless': False}
+    kinds = {'_adb._tcp': 'connect', '_adb-tls-connect._tcp': 'connect',
+             '_adb-tls-pairing._tcp': 'pair'}
+    for line in output.splitlines():
+        fields = line.split()
+        if len(fields) != 3 or fields[1].rstrip('.') not in kinds:
+            continue
+        kind = fields[1].rstrip('.')
+        try:
+            address = endpoint(fields[2], None)
+        except InstallError:
+            continue
+        if endpoint_host(address) != endpoint_host(target):
+            continue
+        group = services[kinds[kind]]
+        if address not in group:
+            group.append(address)
+        services['wireless'] |= kind.startswith('_adb-tls-')
+    return services
+
+
 def safe_extract(archive, destination):
     with zipfile.ZipFile(archive) as bundle:
         if sum(item.file_size for item in bundle.infolist()) > 128 * 1024 * 1024:
@@ -230,28 +257,167 @@ class Adb:
     def shell(self, *args, **kwargs):
         return self.run('shell', shlex.join(map(str, args)), **kwargs)
 
-    def connect(self, pair=None):
-        if pair:
-            if not sys.stdin.isatty():
-                raise InstallError('Pairing needs an interactive terminal so the code can be entered privately. Rerun in Terminal.')
-            code = getpass.getpass('Pairing code shown on the TV: ')
-            # A pairing code is passed through stdin, never process arguments or a log.
-            output = self.run('pair', endpoint(pair, None), targeted=False, stdin=code + '\n')
-            if 'Successfully paired' not in output:
-                raise InstallError('Pairing failed. Open a new pairing-code screen on the TV and try again.')
+    def pair(self, address):
+        address = endpoint(address, None)
+        if endpoint_host(address) != endpoint_host(self.target):
+            raise InstallError('The pairing address must belong to the TV IP you entered.')
+        if not sys.stdin.isatty():
+            raise InstallError('Pairing needs an interactive terminal so the code can be entered privately. Rerun in Terminal.')
+        while True:
+            code = getpass.getpass('Six-digit pairing code shown on the TV: ').strip()
+            if re.fullmatch(r'[0-9]{6}', code):
+                break
+            print('Enter the six digits from the TV pairing screen.')
+        # A pairing code is passed through stdin, never process arguments or a log.
+        output = self.run('pair', address, targeted=False, stdin=code + '\n', checked=False)
+        if 'Successfully paired' not in output:
+            raise InstallError('Pairing failed. Open a new pairing-code screen on the TV and try again.')
+
+    def try_connection(self):
         if not self.target.startswith('emulator-') and ':' in self.target:
-            print('Connecting to ' + self.target + '...')
-            self.run('connect', self.target, targeted=False, checked=False)
-        state = self.run('get-state', checked=False)
-        if 'unauthorized' in state:
+            try:
+                self.run('connect', self.target, targeted=False, checked=False, timeout=5)
+            except InstallError:
+                pass  # A timed-out connect can still leave an authorisation prompt on the TV.
+        try:
+            state = self.run('get-state', checked=False, timeout=5)
+        except InstallError:
+            return False
+        while 'unauthorized' in state:
             print('On the TV, accept “Allow debugging?” for this computer. Select Always allow if it is your computer.')
             if not sys.stdin.isatty():
                 raise InstallError('TV authorisation is required. Accept its prompt, then rerun.')
-            input('Press Enter here after accepting on the TV. ')
-            state = self.run('get-state', checked=False)
-        if state.strip() != 'device':
-            raise InstallError('TV is not connected. Check its IP, debugging switch and same-network connection. '
-                               'With pairing, use the connection port from the main Wireless debugging screen, not the pairing port.\n' + state)
+            ui.prompt('Press Enter here after accepting on the TV. ')
+            state = self.run('get-state', checked=False, timeout=5)
+        return state.strip() == 'device'
+
+    def discover(self, wait=False, required=None):
+        # Give a newly started ADB server / pairing screen time to announce itself.
+        services = {'connect': [], 'pair': [], 'wireless': False}
+        for attempt in range(3 if wait else 1):
+            if attempt:
+                time.sleep(1)
+            try:
+                output = self.run('mdns', 'services', targeted=False, checked=False, timeout=5)
+            except InstallError:
+                break
+            services = mdns_services(output, self.target)
+            if (services[required] if required else services['connect'] or services['pair']):
+                break
+        return services
+
+    def try_addresses(self, addresses):
+        original = self.target
+        for address in dict.fromkeys(addresses):
+            if endpoint_host(address) != endpoint_host(original):
+                continue
+            self.target = endpoint(address, None)
+            if self.try_connection():
+                return True
+        self.target = original
+        return False
+
+    def known_addresses(self):
+        """Reuse numeric network transports for this IP, never select another device."""
+        try:
+            output = self.run('devices', targeted=False, checked=False, timeout=5)
+        except InstallError:
+            return []
+        addresses = []
+        for line in output.splitlines():
+            fields = line.split()
+            if len(fields) != 2 or fields[1] != 'device':
+                continue
+            try:
+                address = endpoint(fields[0], None)
+            except InstallError:
+                continue
+            if endpoint_host(address) == endpoint_host(self.target):
+                addresses.append(address)
+        return addresses
+
+    def guided_pairing(self, services):
+        ui.panel('Allow this computer to connect', [
+            'On the TV, open Settings > Developer options > Wireless debugging.',
+            'Choose Pair device with pairing code and keep that screen open.',
+            'Setup will look up the connection details and ask for the six-digit code.'
+        ])
+        if ui.prompt('Press Enter when the pairing code is visible (or type back): ').strip().lower() == 'back':
+            return False
+        # The pairing port can change every time the TV opens this screen.
+        fresh = self.discover(wait=True, required='pair')
+        pairs = fresh['pair']
+        if len(pairs) == 1:
+            pair = pairs[0]
+        else:
+            print('Automatic discovery could not identify one pairing port for this TV.')
+            print('On the pairing-code screen, copy the number after the colon in IP address & port.')
+            pair = ask_tv_port(self.target, 'Pairing port')
+            if pair is None:
+                return False
+        try:
+            self.pair(pair)
+        except InstallError as error:
+            print(error)
+            return False
+        print('Paired. Finding the TV connection...')
+        after = self.discover(wait=True, required='connect')
+        addresses = after['connect'] + fresh['connect'] + services['connect'] + self.known_addresses()
+        if self.try_addresses(addresses + [self.target]):
+            return True
+        if addresses:
+            print('The TV paired, but its connection is not responding yet. Keep Wireless debugging enabled and retry.')
+            return False
+        print('Your network is not reporting the TV connection port automatically.')
+        print('Close the pairing-code screen. On the MAIN Wireless debugging screen, copy the port after the colon.')
+        address = ask_tv_port(self.target, 'Connection port')
+        if address is None:
+            return False
+        self.target = address
+        return self.try_connection()
+
+    def connect_automatically(self):
+        while True:
+            print('Looking for your TV at ' + endpoint_host(self.target) + '...', flush=True)
+            if self.try_connection():
+                return
+            if self.try_addresses(self.known_addresses()):
+                return
+            services = self.discover(wait=True)
+            if self.try_addresses(services['connect']):
+                return
+            if not sys.stdin.isatty():
+                raise InstallError('The TV is not connected. Enable debugging and run setup interactively for connection help.')
+            if services['wireless'] and self.guided_pairing(services):
+                return
+            ui.panel('The TV has not connected yet', [
+                'Keep the TV awake and check that debugging is switched on in Developer options.',
+                'Check its IP in Settings > Network or About > Status. Use the same home network, not guest Wi-Fi.',
+                'If Wireless debugging shows a pairing code, type pair below. If it shows IP address & port, you can enter that full address.',
+                'If this TV has no network debugging support, see docs/INSTALLATION.md > Troubleshooting.'
+            ])
+            while True:
+                answer = ui.prompt('Press Enter to retry, enter the TV IP, or type pair: ').strip()
+                if not answer:
+                    break
+                if answer.lower() == 'pair':
+                    if self.guided_pairing(services):
+                        return
+                    continue
+                try:
+                    self.target = endpoint(answer)
+                    break
+                except InstallError as error:
+                    print(error)
+
+    def connect(self, pair=None, automatic=False):
+        if pair:
+            self.pair(pair)
+        elif automatic:
+            return self.connect_automatically()
+        print('Connecting to ' + self.target + '...')
+        if not self.try_connection():
+            raise InstallError('TV is not connected. Check its IP, debugging switch and same-network connection.')
 
 
 def component(output):
@@ -464,66 +630,48 @@ def choose_action():
         print('Type 1, 2, 3 or 4, then press Enter.')
 
 
-def ask_endpoint(prompt, default_port=5555, *, allow_back=False, port_label='Port'):
+def ask_endpoint(prompt, default_port=5555):
     while True:
         value = ui.prompt(prompt).strip()
-        if allow_back and value.lower() == 'back':
-            return None
         try:
             return endpoint(value, default_port)
-        except MissingPort as error:
-            print(error)
-            if allow_back:
-                print('If the TV shows no port, type back, then choose n for Network / USB debugging.')
-            while True:
-                port = ui.prompt(port_label + (' (or back)' if allow_back else '') + ': ').strip()
-                if allow_back and port.lower() == 'back':
-                    return None
-                if re.fullmatch(r'[0-9]{1,5}', port) and 1 <= int(port) <= 65535:
-                    return endpoint(value, int(port))
-                print('Enter only the port number shown on the TV (1–65535).' +
-                      (' Type back to choose another connection method.' if allow_back else ''))
         except InstallError as error:
-            print(str(error) + (' Type back to choose another connection method.' if allow_back else '') +
-                  ' Try again, or press Ctrl+C to cancel.')
+            print(str(error) + ' Try again, or press Ctrl+C to cancel.')
+
+
+def ask_tv_port(target, label):
+    """Last-resort input when network discovery is unavailable; retain the TV IP."""
+    while True:
+        value = ui.prompt(label + ' shown on the TV (or back): ').strip()
+        if value.lower() == 'back':
+            return None
+        try:
+            address = endpoint(endpoint_host(target), int(value)) if re.fullmatch(r'[0-9]{1,5}', value) else endpoint(value, None)
+            if endpoint_host(address) != endpoint_host(target):
+                raise InstallError('Use the port for the TV IP you already entered.')
+            return address
+        except InstallError as error:
+            print(str(error) + ' Enter the port number, or type back to return to connection checks.')
 
 
 def wizard():
     ui.step(1, 'Prepare your TV')
-    ui.panel('On the TV, using your remote', [
-        'Connect the TV and this computer to the same home network. Keep the TV awake.',
+    ui.panel('Enable the TV connection', [
+        'Connect the TV and this computer to the same home network. Wi-Fi or Ethernet both work. Keep the TV awake.',
         '1. Open Settings > System > About (or Device Preferences > About).',
         '2. Select Android TV OS build / Build number seven times, until developer mode is enabled.',
         '3. Go back and open Developer options.',
-        '4. Turn on Network / ADB debugging. Some TCL models call this USB debugging. Newer TVs may offer Wireless debugging with a pairing code.',
-        'Leave OEM unlocking alone; setup does not need it.',
-        'When the TV asks Allow debugging?, accept with your remote.'
+        '4. Turn on Network debugging or ADB debugging. On many TCL TVs, the switch is called USB debugging: turn it on even though setup uses the network.',
+        '5. If the TV offers Wireless debugging instead, turn it on and allow your home network. Keep that screen open; setup will handle the connection.',
+        'Leave OEM unlocking alone. When the TV asks Allow debugging?, accept with your remote.'
     ])
     ui.step(2, 'Connect to your TV')
-    while True:
-        print('Choose y for a TV screen with a pairing code. Choose n for a Network, ADB or USB debugging switch (usual on older TCL TVs).')
-        print('You can type back at an address or port prompt to choose again.')
-        pairing = confirm('Can you open “Pair device with pairing code” on the TV?')
-        if pairing:
-            print('Enable Wireless debugging. First note the connection address on its MAIN screen.')
-            target = ask_endpoint('TV IP address (or IP:connection port): ', None,
-                                  allow_back=True, port_label='Connection port')
-            if target is None:
-                continue
-            print('Now open Pair device with pairing code and KEEP that screen open.')
-            print('Its pairing port is different from the connection port above.')
-            pair = ask_endpoint('TV IP address from the pairing screen (or IP:pairing port): ', None,
-                                allow_back=True, port_label='Pairing port')
-            if pair is None:
-                continue
-            return target, pair
-        print('Enable Network debugging (sometimes called ADB debugging). Some TVs use a switch named USB debugging.')
-        print('Find the TV IP under Network > your connection, or About > Status.')
-        print('An IP address alone uses the usual network debugging port, 5555.')
-        print('USB debugging alone does not enable network ADB on every TV. See the guide if connection is refused.')
-        target = ask_endpoint('TV IP address (or IP:port): ', allow_back=True)
-        if target is not None:
-            return target, None
+    ui.panel('Find the TV IP address', [
+        'On the TV, open Settings > Network & Internet > your connected Wi-Fi or Ethernet network.',
+        'Look for IP address. It may also be under Settings > About > Status.',
+        'Type that address below, for example 192.0.2.10. Setup will find the connection automatically.'
+    ])
+    return ask_endpoint('TV IP address: '), None
 
 
 def main(argv=None):
@@ -565,7 +713,7 @@ def main(argv=None):
             parser.error('Supply --target IP[:port], or run interactively for guided setup')
         target, pair = wizard()
     adb = Adb(find_adb(args.adb, args.accept_google_license), target)
-    adb.connect(pair)
+    adb.connect(pair, automatic=not args.serial and not pair)
     info = inspect_tv(adb, require_launcher=args.action != 'restore')
     ui.step(3, 'Check your TV')
     ui.panel('Connected television', [
@@ -577,7 +725,9 @@ def main(argv=None):
     state_path = (args.state or data_dir() / (info['device_id'][:24] + '.json')).expanduser().resolve()
     load_state(state_path, info)  # Reject a mismatched file before any mutation.
     if args.action == 'doctor':
-        print('Network ADB and basic launcher prerequisites pass. Recovery file: ' + str(state_path))
+        ui.step(4, 'Connection ready')
+        ui.success('Your TV is connected and meets the launcher prerequisites. No TV settings or apps were changed.')
+        print('To install Maré, run setup again and choose 1. Recovery file location: ' + str(state_path))
         return
     apk = args.apk or (ROOT / 'mare-launcher.apk' if (ROOT / 'mare-launcher.apk').exists() else ROOT / 'dist/mare-launcher.apk')
     if args.action == 'install':

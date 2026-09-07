@@ -152,31 +152,14 @@ class InstallerTests(unittest.TestCase):
             app.endpoint('192.0.2.', None)
         self.assertNotIsInstance(raised.exception, app.MissingPort)
 
-    def test_wireless_setup_accepts_separate_ip_and_ports(self):
-        with patch('builtins.input', side_effect=['y', '192.0.2.10', '37123', '192.0.2.10', '40231']):
-            self.assertEqual(app.wizard(), ('192.0.2.10:37123', '192.0.2.10:40231'))
-
-    def test_wireless_setup_still_accepts_complete_addresses(self):
-        with patch('builtins.input', side_effect=['y', '[fd00::10]:37123', '[fd00::10]:40231']):
-            self.assertEqual(app.wizard(), ('[fd00::10]:37123', '[fd00::10]:40231'))
-
-    def test_wireless_port_typo_preserves_ipv6_address(self):
-        with patch('builtins.input', side_effect=['[fd00::10]', '', '0', '65536', 'no', '37;reboot', '37123']):
-            self.assertEqual(app.ask_endpoint('TV address: ', None), '[fd00::10]:37123')
-
-    def test_wrong_pairing_choice_can_return_to_network_debugging(self):
-        with patch('builtins.input', side_effect=['y', '192.0.2.10', 'back', 'n', '192.0.2.10']):
+    def test_setup_asks_only_for_the_tv_ip(self):
+        with patch('builtins.input', side_effect=['192.0.2.10']) as prompt:
             self.assertEqual(app.wizard(), ('192.0.2.10:5555', None))
+        self.assertEqual(prompt.call_count, 1)
 
-    def test_back_from_pairing_discards_previous_connection(self):
-        for inputs in [['y', '192.0.2.10:37123', 'back'],
-                       ['y', '192.0.2.10:37123', '192.0.2.10', 'back']]:
-            with self.subTest(inputs=inputs), patch('builtins.input', side_effect=inputs + ['n', '192.0.2.20']):
-                self.assertEqual(app.wizard(), ('192.0.2.20:5555', None))
-
-    def test_network_setup_can_switch_to_pairing(self):
-        with patch('builtins.input', side_effect=['n', 'back', 'y', '192.0.2.10:37123', '192.0.2.10:40231']):
-            self.assertEqual(app.wizard(), ('192.0.2.10:37123', '192.0.2.10:40231'))
+    def test_manual_port_fallback_retains_ip_and_rejects_another_tv(self):
+        with patch('builtins.input', side_effect=['', '0', '65536', '37;reboot', '[fd00::20]:37123', '37123']):
+            self.assertEqual(app.ask_tv_port('[fd00::10]:5555', 'Connection port'), '[fd00::10]:37123')
 
     def test_confirmation_typo_requires_an_explicit_answer(self):
         with patch('builtins.input', side_effect=['yees', 'y']):
