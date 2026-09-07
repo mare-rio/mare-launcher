@@ -2,7 +2,7 @@
 
 Use this guide for **TCL Android TV and Google TV**, or another compatible Android TV. You do not need to build software, unlock the TV or use the Play Store to install Maré. TCL Roku TVs use a different operating system and cannot install this APK.
 
-**[Download the guided installer ZIP](https://github.com/mare-rio/mare-launcher/releases/latest/download/mare-launcher-install.zip)**, right-click it and choose **Extract All** on Windows, or double-click it on macOS. On Linux, use your file manager’s Extract option. Open **START_HERE.html** in the extracted folder for the short walkthrough.
+**[Download the guided installer ZIP](https://github.com/mare-rio/mare-launcher/releases/latest/download/mare-launcher-install.zip)**, right-click it and choose **Extract All** on Windows, or double-click it on macOS. On Linux, use your file manager’s Extract option. Start the terminal installer from that folder: **`sh install.sh`** on macOS/Linux or **`.\install.cmd`** in Windows Terminal. Setup explains the TV preparation steps as you go.
 
 ## Before you start
 
@@ -50,8 +50,10 @@ USB debugging alone does **not** turn on network access on all models. If the co
 | Computer | Start setup from the extracted folder |
 | --- | --- |
 | Windows | Double-click `install.cmd`, or run `py -3 install.py` in Terminal |
-| macOS | Open Terminal in the folder and run `sh install.command` |
+| macOS | Open Terminal in the folder and run `sh install.sh` |
 | Linux | Open a terminal in the folder and run `sh install.sh` |
+
+The terminal shows a setup menu, numbered steps, a panel identifying the connected TV, and the changes to confirm. Use `--plain` or set `NO_COLOR=1` for simpler output. No browser or HTML page is needed.
 
 The installer finds ADB if it is already installed. Otherwise it offers a pinned download from Google and displays Google’s SDK licence before asking you to accept it. It verifies the archive’s SHA-256 before extraction. On ARM Linux, install the distribution’s native `adb` package instead.
 

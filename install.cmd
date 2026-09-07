@@ -1,5 +1,6 @@
 @echo off
 setlocal
+set "PYTHONUTF8=1"
 cd /d "%~dp0"
 where py >nul 2>nul
 if not errorlevel 1 (
@@ -7,7 +8,7 @@ if not errorlevel 1 (
 ) else (
   where python >nul 2>nul
   if errorlevel 1 (
-    echo Install Python 3.9 or later from python.org. Open START_HERE.html for the walkthrough.
+    echo Install Python 3.9 or later from python.org. Then run this command again. Help: docs/INSTALLATION.md.
     pause
     exit /b 1
   )

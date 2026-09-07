@@ -27,7 +27,6 @@ def create_bundle(root, apk, output):
              'docs/INSTALLATION.md', 'docs/COMPATIBILITY.md']
     names += [str(p.relative_to(root)).replace('\\', '/') for p in sorted((root / 'licenses').glob('*.txt'))]
     files = {name: root / name for name in names}
-    files['START_HERE.html'] = root / 'docs/START_HERE.html'
     files.update({'mare-launcher.apk': apk, 'release.json': apk.parent / 'release.json'})
     if any(not path.is_file() or path.is_symlink() for path in files.values()):
         raise ValueError('Bundle input is missing or is a symbolic link.')

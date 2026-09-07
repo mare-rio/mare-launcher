@@ -9,3 +9,5 @@ Installer changes need fault/recovery tests. A failure must not leave the user g
 CI changes require careful review of [CI_SECURITY.md](docs/CI_SECURITY.md). Tests and dependency install/build scripts are executable contributor code too. Do not add secrets, self-hosted runners, privileged PR execution or release automation.
 
 Contributions must be compatible with the project’s MIT licence and preserve third-party notices. Public repository contribution and security-reporting links will be added when publication is approved.
+
+All files are owned by the Maré Rio `launcher-maintainers` team. Member-owned PRs satisfy ownership; other PRs require that team’s approval. CI is required for everyone, with no ruleset bypass actors.

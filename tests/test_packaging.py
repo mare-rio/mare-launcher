@@ -45,7 +45,7 @@ class PackagingTests(unittest.TestCase):
                 self.assertNotIn('private.jks', bundle.namelist())
                 self.assertNotIn('device-evidence.json', bundle.namelist())
                 self.assertIn('mare-launcher.apk', bundle.namelist())
-                self.assertIn('START_HERE.html', bundle.namelist())
+                self.assertNotIn('START_HERE.html', bundle.namelist())
                 self.assertNotIn('docs/CI_SECURITY.md', bundle.namelist())
                 self.assertNotIn('CONTRIBUTING.md', bundle.namelist())
                 for line in bundle.read('SHA256SUMS').decode().splitlines():
