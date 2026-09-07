@@ -153,7 +153,7 @@ class InstallerTests(unittest.TestCase):
              patch.object(app, 'inspect_tv', return_value={**self.info, 'manufacturer': 'Test', 'model': 'TV', 'webview': ''}), \
              patch.object(app, 'restore') as restore, patch.object(app, 'install') as install:
             app.main(['--state', str(self.state)])
-        restore.assert_called_once_with(self.adb, {**self.info, 'manufacturer': 'Test', 'model': 'TV', 'webview': ''}, self.state, False)
+        restore.assert_called_once_with(self.adb, {**self.info, 'manufacturer': 'Test', 'model': 'TV', 'webview': ''}, self.state.resolve(), False)
         install.assert_not_called()
 
     @patch.object(app, 'home_is_running', return_value=False)
