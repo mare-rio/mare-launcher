@@ -22,12 +22,12 @@ def create_bundle(root, apk, output):
     if hashlib.sha256(apk.read_bytes()).hexdigest() != info['apkSha256']:
         raise ValueError('APK checksum does not match release.json.')
     # An explicit allowlist keeps keys, device captures and development files out.
-    names = ['install.py', 'install.cmd', 'install.command', 'install.sh', 'README.md', 'LICENSE',
-             'THIRD_PARTY_NOTICES.md', 'SECURITY.md', 'CONTRIBUTING.md', 'scripts/platform-tools.json',
-             'docs/INSTALLATION.md', 'docs/COMPATIBILITY.md', 'docs/CI_SECURITY.md',
-             'docs/BUILDING.md', 'docs/images/home-night.png', 'docs/images/home-day.png']
+    names = ['install.py', 'install.cmd', 'install.command', 'install.sh', 'LICENSE',
+             'THIRD_PARTY_NOTICES.md', 'scripts/platform-tools.json',
+             'docs/INSTALLATION.md', 'docs/COMPATIBILITY.md']
     names += [str(p.relative_to(root)).replace('\\', '/') for p in sorted((root / 'licenses').glob('*.txt'))]
     files = {name: root / name for name in names}
+    files['START_HERE.html'] = root / 'docs/START_HERE.html'
     files.update({'mare-launcher.apk': apk, 'release.json': apk.parent / 'release.json'})
     if any(not path.is_file() or path.is_symlink() for path in files.values()):
         raise ValueError('Bundle input is missing or is a symbolic link.')
@@ -52,7 +52,7 @@ def main():
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
     info = json.loads((args.apk.parent / 'release.json').read_text())
-    output = args.output or ROOT / 'dist' / ('mare-launcher-' + info['version'] + '-install.zip')
+    output = args.output or ROOT / 'dist' / 'mare-launcher-install.zip'
     digest = create_bundle(ROOT, args.apk, output)
     print('Prepared locally: ' + str(output) + '\nSHA256: ' + digest + '\nNothing was published.')
 

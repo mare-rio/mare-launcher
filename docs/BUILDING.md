@@ -55,7 +55,7 @@ Dependencies are pinned, but byte-for-byte reproducibility of APK ZIP timestamps
 
 ## Separate local signing
 
-Installable releases are currently on hold; source publication does not include signing keys or a downloadable APK. Do not upload a keystore or password to Actions. Choose and back up the long-term signing identity before the first public release; Android updates depend on retaining it. Existing private previews have a separate signing history that must be considered before public rollout.
+Production APKs are signed locally and published through GitHub Releases. Do not upload a keystore or password to Actions. Keep the release signing identity backed up privately: Android updates depend on retaining it. The 0.3.0 release retains the signing identity used by the existing Maré previews.
 
 Use a trusted copy of the signing helper and Android SDK in a signing environment that does not execute contributor build code. Transfer the reviewed unsigned APK with its matching `release.json`; independently record the approved unsigned SHA-256. Set `MARE_KEYSTORE_PASSWORD` privately in that environment, then run:
 
@@ -72,6 +72,6 @@ python3 scripts/check_apk.py
 python3 scripts/package_release.py
 ```
 
-The bundle contains the signed production APK, guided installer, platform-tool pins, guides, notices and checksums. It excludes source workspaces, keys, device evidence and CI credentials. Packaging rejects unsigned/debug APKs and builds from dirty or uncommitted trees. Output stays in ignored `dist/`; no tool in this repository publishes a release.
+The `dist/mare-launcher-install.zip` bundle contains the signed production APK, guided installer, an offline START_HERE.html walkthrough, platform-tool pins, installation/compatibility guides, notices and checksums. Contributor documentation stays in the source repository. It excludes source workspaces, keys, device evidence and CI credentials. Packaging rejects unsigned/debug APKs and builds from dirty or uncommitted trees. Output stays in ignored `dist/`; no tool in this repository publishes a release.
 
 Before publication, verify the ZIP’s contents and checksum, install it from a fresh extraction, verify Home after a normal reboot, and restore the previous Home from the saved record. Record the exact tested revision, OS and TV/WebView versions. Native macOS/Windows installation and additional manufacturers remain separate compatibility gates.
