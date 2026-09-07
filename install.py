@@ -32,6 +32,10 @@ class InstallError(Exception):
     pass
 
 
+class MissingPort(InstallError):
+    pass
+
+
 class Terminal:
     """Small, dependency-free terminal presentation; plain output when redirected."""
     plain = False
@@ -130,11 +134,16 @@ def endpoint(value, default_port=5555):
         host, port = value, None
     try:
         address = ipaddress.ip_address(host)
+    except ValueError:
+        raise InstallError('Enter a valid TV IP address, for example 192.0.2.10.') from None
+    if port is None and default_port is None:
+        raise MissingPort('This IP address is valid. Wireless debugging also needs the port shown after the colon on the TV.')
+    try:
         number = int(port) if port is not None else default_port
-        if number is None or not 1 <= number <= 65535:
+        if not 1 <= number <= 65535:
             raise ValueError()
     except ValueError:
-        raise InstallError('Enter the TV IP address and a valid port, exactly as shown on the TV.') from None
+        raise InstallError('The port must be a number from 1 to 65535, as shown on the TV.') from None
     return ('[' + str(address) + ']' if address.version == 6 else str(address)) + ':' + str(number)
 
 
@@ -455,12 +464,28 @@ def choose_action():
         print('Type 1, 2, 3 or 4, then press Enter.')
 
 
-def ask_endpoint(prompt, default_port=5555):
+def ask_endpoint(prompt, default_port=5555, *, allow_back=False, port_label='Port'):
     while True:
+        value = ui.prompt(prompt).strip()
+        if allow_back and value.lower() == 'back':
+            return None
         try:
-            return endpoint(ui.prompt(prompt), default_port)
+            return endpoint(value, default_port)
+        except MissingPort as error:
+            print(error)
+            if allow_back:
+                print('If the TV shows no port, type back, then choose n for Network / USB debugging.')
+            while True:
+                port = ui.prompt(port_label + (' (or back)' if allow_back else '') + ': ').strip()
+                if allow_back and port.lower() == 'back':
+                    return None
+                if re.fullmatch(r'[0-9]{1,5}', port) and 1 <= int(port) <= 65535:
+                    return endpoint(value, int(port))
+                print('Enter only the port number shown on the TV (1–65535).' +
+                      (' Type back to choose another connection method.' if allow_back else ''))
         except InstallError as error:
-            print(str(error) + ' Try again, or press Ctrl+C to cancel.')
+            print(str(error) + (' Type back to choose another connection method.' if allow_back else '') +
+                  ' Try again, or press Ctrl+C to cancel.')
 
 
 def wizard():
@@ -470,22 +495,35 @@ def wizard():
         '1. Open Settings > System > About (or Device Preferences > About).',
         '2. Select Android TV OS build / Build number seven times, until developer mode is enabled.',
         '3. Go back and open Developer options.',
-        '4. Turn on Network / ADB debugging. Some TCL models call this USB debugging. If present, use Wireless debugging instead.',
+        '4. Turn on Network / ADB debugging. Some TCL models call this USB debugging. Newer TVs may offer Wireless debugging with a pairing code.',
         'Leave OEM unlocking alone; setup does not need it.',
         'When the TV asks Allow debugging?, accept with your remote.'
     ])
-    pairing = confirm('Does the TV have Wireless debugging with a “Pair device with pairing code” option?')
     ui.step(2, 'Connect to your TV')
-    if pairing:
-        print('Enable Wireless debugging. First note the connection address on its MAIN screen.')
-        target = ask_endpoint('IP address and connection port: ', None)
-        print('Now open Pair device with pairing code and KEEP that screen open.')
-        pair = ask_endpoint('IP address and pairing port from the pairing screen: ', None)
-        return target, pair
-    print('Enable Network debugging (sometimes called ADB debugging). Some TVs use a switch named USB debugging.')
-    print('Find the TV IP under Network > your connection, or About > Status.')
-    print('USB debugging alone does not enable network ADB on every TV. See the guide if connection is refused.')
-    return ask_endpoint('TV IP address (or IP:port): '), None
+    while True:
+        print('Choose y for a TV screen with a pairing code. Choose n for a Network, ADB or USB debugging switch (usual on older TCL TVs).')
+        print('You can type back at an address or port prompt to choose again.')
+        pairing = confirm('Can you open “Pair device with pairing code” on the TV?')
+        if pairing:
+            print('Enable Wireless debugging. First note the connection address on its MAIN screen.')
+            target = ask_endpoint('TV IP address (or IP:connection port): ', None,
+                                  allow_back=True, port_label='Connection port')
+            if target is None:
+                continue
+            print('Now open Pair device with pairing code and KEEP that screen open.')
+            print('Its pairing port is different from the connection port above.')
+            pair = ask_endpoint('TV IP address from the pairing screen (or IP:pairing port): ', None,
+                                allow_back=True, port_label='Pairing port')
+            if pair is None:
+                continue
+            return target, pair
+        print('Enable Network debugging (sometimes called ADB debugging). Some TVs use a switch named USB debugging.')
+        print('Find the TV IP under Network > your connection, or About > Status.')
+        print('An IP address alone uses the usual network debugging port, 5555.')
+        print('USB debugging alone does not enable network ADB on every TV. See the guide if connection is refused.')
+        target = ask_endpoint('TV IP address (or IP:port): ', allow_back=True)
+        if target is not None:
+            return target, None
 
 
 def main(argv=None):
