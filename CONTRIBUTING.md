@@ -10,4 +10,4 @@ CI changes require careful review of [CI_SECURITY.md](docs/CI_SECURITY.md). Test
 
 Contributions must be compatible with the project’s MIT licence and preserve third-party notices. Public repository contribution and security-reporting links will be added when publication is approved.
 
-All files are owned by the Maré Rio `launcher-maintainers` team. Member-owned PRs satisfy ownership; other PRs require that team’s approval. CI is required for everyone, with no ruleset bypass actors.
+All files are owned by the Maré Rio members named in `.github/CODEOWNERS` (currently the organisation’s sole member, `@danielcavalli`). Their own PRs satisfy ownership; other PRs require a listed member’s approval. CI is required for everyone, with no ruleset bypass actors.
