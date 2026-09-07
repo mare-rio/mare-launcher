@@ -13,8 +13,8 @@ Maré replaces the home screen on **TCL Android TV and Google TV** with your fav
 The guided installer sets Maré as the screen your TV opens when you press **Home**. You need a Windows, Mac or Linux computer on the same home network as your TV. Your apps and their settings stay in place.
 
 1. **[Download the installer ZIP](https://github.com/mare-rio/mare-launcher/releases/latest/download/mare-launcher-install.zip)** and extract it.
-2. Open **START_HERE.html** in the extracted folder. It explains how to prepare your TV and start setup, step by step. The computer needs Python; the guide includes the download link.
-3. Follow setup’s prompts, then press **Home** on your remote. In Maré, open **Apps**, hold **OK** on an app and choose **Pin to home**.
+2. In the extracted folder, run **`sh install.sh`** on macOS/Linux, or **`.\install.cmd`** in Windows Terminal. You need [Python 3.9 or newer](https://www.python.org/downloads/).
+3. The terminal walks you through the TV settings, connection and installation. Follow its prompts, then press **Home** on your remote. In Maré, open **Apps**, hold **OK** on an app and choose **Pin to home**.
 
 [Read the installation guide](docs/INSTALLATION.md) · [Install just the APK](docs/INSTALLATION.md#install-just-the-apk) · [Release notes](https://github.com/mare-rio/mare-launcher/releases/latest)
 

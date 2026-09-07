@@ -145,6 +145,17 @@ class InstallerTests(unittest.TestCase):
         with patch('builtins.input', side_effect=['192.0.2.', '192.0.2.10']):
             self.assertEqual(app.ask_endpoint('TV address: '), '192.0.2.10:5555')
 
+    def test_confirmation_typo_requires_an_explicit_answer(self):
+        with patch('builtins.input', side_effect=['yees', 'y']):
+            self.assertTrue(app.confirm('Continue?'))
+
+    def test_redirected_terminal_output_has_no_escape_sequences(self):
+        stream = io.StringIO()
+        with contextlib.redirect_stdout(stream):
+            app.ui.panel('Connected TV', ['Untrusted model: \x1b[31mTCL\x1b[0m'])
+        self.assertIn('TCL', stream.getvalue())
+        self.assertNotIn('\x1b', stream.getvalue())
+
     def test_guided_restore_menu_dispatches_without_installing(self):
         with patch.object(app.sys.stdin, 'isatty', return_value=True), patch('builtins.input', side_effect=['2', 'y']), \
              patch.object(app, 'wizard', return_value=('192.0.2.10:5555', None)), \

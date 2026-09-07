@@ -72,6 +72,6 @@ python3 scripts/check_apk.py
 python3 scripts/package_release.py
 ```
 
-The `dist/mare-launcher-install.zip` bundle contains the signed production APK, guided installer, an offline START_HERE.html walkthrough, platform-tool pins, installation/compatibility guides, notices and checksums. Contributor documentation stays in the source repository. It excludes source workspaces, keys, device evidence and CI credentials. Packaging rejects unsigned/debug APKs and builds from dirty or uncommitted trees. Output stays in ignored `dist/`; no tool in this repository publishes a release.
+The `dist/mare-launcher-install.zip` bundle contains the signed production APK, guided installer, platform-tool pins, installation/compatibility guides, notices and checksums. Contributor documentation stays in the source repository. It excludes source workspaces, keys, device evidence and CI credentials. Packaging rejects unsigned/debug APKs and builds from dirty or uncommitted trees. Output stays in ignored `dist/`; no tool in this repository publishes a release.
 
 Before publication, verify the ZIP’s contents and checksum, install it from a fresh extraction, verify Home after a normal reboot, and restore the previous Home from the saved record. Record the exact tested revision, OS and TV/WebView versions. Native macOS/Windows installation and additional manufacturers remain separate compatibility gates.

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1 — 7 September 2026
+
+- Put guided setup entirely in the terminal, with coloured panels, numbered steps, TV preparation prompts and plain-output support.
+- Remove the HTML walkthrough from the installer and direct users to the shell command.
+- Enforce member authorship or code-owner approval through native GitHub review rules, with no review-bypass actors.
+
 ## 0.3.0 — 7 September 2026
 
 - Extract the existing Maré grid launcher into a standalone source package using only public dependencies and included design assets.

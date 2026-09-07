@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import textwrap
 import urllib.request
 import urllib.parse
 import zipfile
@@ -31,8 +32,65 @@ class InstallError(Exception):
     pass
 
 
+class Terminal:
+    """Small, dependency-free terminal presentation; plain output when redirected."""
+    plain = False
+
+    @staticmethod
+    def clean(value):
+        value = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', str(value))
+        return re.sub(r'[\x00-\x08\x0b-\x1f\x7f]', '', value)
+
+    def styled(self, value, colour='36'):
+        value = self.clean(value)
+        colour_ok = sys.stdout.isatty() and not self.plain and 'NO_COLOR' not in os.environ and os.environ.get('TERM') != 'dumb'
+        if colour_ok and os.name == 'nt':
+            # Older Windows consoles require enabling virtual terminal output.
+            import ctypes
+            handle = ctypes.windll.kernel32.GetStdHandle(-11)
+            mode = ctypes.c_ulong()
+            colour_ok = bool(ctypes.windll.kernel32.GetConsoleMode(handle, ctypes.byref(mode)) and
+                             ctypes.windll.kernel32.SetConsoleMode(handle, mode.value | 4))
+        return '\x1b[' + colour + 'm' + value + '\x1b[0m' if colour_ok else value
+
+    def panel(self, title, lines):
+        width = max(24, min(shutil.get_terminal_size((88, 24)).columns, 96) - 2)
+        unicode_ok = not self.plain and sys.stdout.isatty()
+        try:
+            '╭─╮│╰╯'.encode(sys.stdout.encoding or 'utf-8')
+        except UnicodeEncodeError:
+            unicode_ok = False
+        tl, h, tr, v, bl, br = ('╭', '─', '╮', '│', '╰', '╯') if unicode_ok else ('+', '-', '+', '|', '+', '+')
+        print()
+        print(self.styled(tl + h * (width - 2) + tr))
+        for row, heading in [(title, True), ('', False)] + [(line, False) for line in lines]:
+            for part in textwrap.wrap(self.clean(row), width - 4, replace_whitespace=True) or ['']:
+                print(self.styled(v) + ' ' + self.styled(part.ljust(width - 4), '1;36' if heading else '0') + ' ' + self.styled(v))
+        print(self.styled(bl + h * (width - 2) + br))
+
+    def step(self, number, title):
+        print('\n' + self.styled(str(number) + ' / 4  ' + title, '1;36'))
+
+    def success(self, message):
+        print('\n' + self.styled('Done  ', '1;32') + self.clean(message))
+
+    def prompt(self, message):
+        return input(self.styled(message, '1;36'))
+
+
+ui = Terminal()
+
+
 def confirm(question, yes=False):
-    return yes or input(question + ' [y/N] ').strip().lower() in ('y', 'yes')
+    if yes:
+        return True
+    while True:
+        answer = ui.prompt(question + ' [y/N] ').strip().lower()
+        if answer in ('y', 'yes'):
+            return True
+        if answer in ('', 'n', 'no'):
+            return False
+        print('Type y for yes or n for no, then press Enter.')
 
 
 def data_dir():
@@ -122,6 +180,7 @@ def find_adb(explicit=None, accept_license=False):
     if not confirm('Do you accept Google’s SDK licence and want to download Platform Tools?', accept_license):
         raise InstallError('Install ADB yourself and rerun with --adb /path/to/adb.')
     item = config['archives'][host]
+    print('Downloading Google connection tools; the archive will be checked before use...', flush=True)
     url = urllib.parse.urlparse(item['url'])
     if url.scheme != 'https' or url.netloc != 'dl.google.com' or not url.path.startswith('/android/repository/'):
         raise InstallError('Platform Tools must come from Google’s official HTTPS repository.')
@@ -268,7 +327,7 @@ def load_state(path, info):
 def verify_apk(apk):
     manifest = apk.parent / 'release.json'
     if not apk.is_file() or not manifest.is_file():
-        raise InstallError('Use the complete Maré installation ZIP: the APK and release.json must be together. Open START_HERE.html.')
+        raise InstallError('Use the complete Maré installation ZIP: the APK and release.json must be together. Run install.cmd on Windows, or sh install.sh on macOS/Linux.')
     info = json.loads(manifest.read_text(encoding='utf-8'))
     if info.get('package') != PACKAGE or info.get('apk') != apk.name or not info.get('signed'):
         raise InstallError('This is not a signed Maré installation bundle.')
@@ -302,7 +361,7 @@ def restore(adb, info, state_path, remove=False):
             raise InstallError('Home was restored, but Android did not remove Maré: ' + output)
     saved['phase'] = 'restored'
     atomic_json(state_path, saved)
-    print('Previous Home and any Google Home packages changed by this installer are restored.')
+    ui.success('Previous Home restored.' + (' Maré has been removed.' if remove else ' Maré stays installed.'))
 
 
 def install(adb, info, apk, state_path, keep_home=False, replace_stock=False, guided=False):
@@ -318,6 +377,7 @@ def install(adb, info, apk, state_path, keep_home=False, replace_stock=False, gu
         saved = {'schema': 1, 'device_id': info['device_id'], 'user': info['user'],
                  'previous_home': info['home'], 'changed_packages': {}, 'phase': 'prepared'}
         atomic_json(state_path, saved)
+    ui.step(4, 'Install Maré and set Home')
     print('Recovery record: ' + str(state_path))
     # A Home-candidate update can clear Android's preference, even if the
     # connection drops before its success response reaches the computer.
@@ -372,19 +432,24 @@ def install(adb, info, apk, state_path, keep_home=False, replace_stock=False, gu
             print('Automatic recovery could not finish: ' + str(error), file=sys.stderr)
             print('Keep the recovery file and rerun restore when the TV is connected.', file=sys.stderr)
         raise
-    print('Maré ' + release['version'] + ' installed. ' + ('Previous Home retained.' if keep_home else 'Home now opens Maré.'))
+    ui.success('Maré ' + release['version'] + ' installed. ' + ('Previous Home retained.' if keep_home else 'Home now opens Maré.'))
     print('In Maré: Apps > hold OK on an app > Pin to home. Settings > Motion can reduce animation.')
     print('You can now turn debugging off on the TV. Turn it on again for updates or recovery.')
 
 
 def choose_action():
-    print('Maré Launcher — guided setup\n')
+    ui.panel('Maré Launcher · TV setup', [
+        'A quieter Home screen for your television.',
+        'This terminal guides you through TV preparation, connection and installation.',
+        'Use the same computer to restore your previous Home later.',
+        'Type a number and press Enter. Press Ctrl+C at any time to stop.'
+    ])
     print('1. Install or update Maré (press Enter)')
     print('2. Restore my previous Home screen')
     print('3. Restore my previous Home screen and remove Maré')
     print('4. Check my TV connection without changing anything')
     while True:
-        choice = input('Choose 1–4: ').strip() or '1'
+        choice = ui.prompt('Choose 1–4: ').strip() or '1'
         if choice in ('1', '2', '3', '4'):
             return {'1': 'install', '2': 'restore', '3': 'restore', '4': 'doctor'}[choice], choice == '3'
         print('Type 1, 2, 3 or 4, then press Enter.')
@@ -393,18 +458,24 @@ def choose_action():
 def ask_endpoint(prompt, default_port=5555):
     while True:
         try:
-            return endpoint(input(prompt), default_port)
+            return endpoint(ui.prompt(prompt), default_port)
         except InstallError as error:
             print(str(error) + ' Try again, or press Ctrl+C to cancel.')
 
 
 def wizard():
-    print('\nConnect your TV\n')
-    print('Keep the TV and this computer on the same trusted home network.')
-    print('TV: Settings > System (or Device Preferences) > About > Android TV OS build.')
-    print('Press OK on the build seven times. Go back and open Developer options.')
-    print('Menu names vary. The step-by-step guide is in docs/INSTALLATION.md.\n')
+    ui.step(1, 'Prepare your TV')
+    ui.panel('On the TV, using your remote', [
+        'Connect the TV and this computer to the same home network. Keep the TV awake.',
+        '1. Open Settings > System > About (or Device Preferences > About).',
+        '2. Select Android TV OS build / Build number seven times, until developer mode is enabled.',
+        '3. Go back and open Developer options.',
+        '4. Turn on Network / ADB debugging. Some TCL models call this USB debugging. If present, use Wireless debugging instead.',
+        'Leave OEM unlocking alone; setup does not need it.',
+        'When the TV asks Allow debugging?, accept with your remote.'
+    ])
     pairing = confirm('Does the TV have Wireless debugging with a “Pair device with pairing code” option?')
+    ui.step(2, 'Connect to your TV')
     if pairing:
         print('Enable Wireless debugging. First note the connection address on its MAIN screen.')
         target = ask_endpoint('IP address and connection port: ', None)
@@ -432,8 +503,10 @@ def main(argv=None):
     parser.add_argument('--keep-home', action='store_true', help='Install/open Maré while retaining the current default Home')
     parser.add_argument('--replace-stock-home', action='store_true', help='If necessary, allow reversible disabling of supported Google Home packages')
     parser.add_argument('--remove', action='store_true', help='With restore, also uninstall Maré for this profile')
+    parser.add_argument('--plain', action='store_true', help='Plain terminal output without colours or box-drawing characters')
     parser.add_argument('--dry-run', action='store_true', help='Connect and inspect; make no TV configuration or package changes')
     args = parser.parse_args(argv)
+    ui.plain = args.plain
     guided = not (args.target or args.serial)
     if guided and sys.stdin.isatty() and args.action is None:
         args.action, remove = choose_action()
@@ -456,9 +529,13 @@ def main(argv=None):
     adb = Adb(find_adb(args.adb, args.accept_google_license), target)
     adb.connect(pair)
     info = inspect_tv(adb, require_launcher=args.action != 'restore')
-    print('\nTV: ' + info['manufacturer'] + ' ' + info['model'] + ' (Android API ' + str(info['api']) + ', profile ' + info['user'] + ')')
-    print('Current Home: ' + (info['home'] or 'not explicitly selected'))
-    print(info['webview'])
+    ui.step(3, 'Check your TV')
+    ui.panel('Connected television', [
+        'TV: ' + info['manufacturer'] + ' ' + info['model'],
+        'Android API: ' + str(info['api']) + '    Profile: ' + info['user'],
+        'Current Home: ' + (info['home'] or 'not explicitly selected'),
+        info['webview']
+    ])
     state_path = (args.state or data_dir() / (info['device_id'][:24] + '.json')).expanduser().resolve()
     load_state(state_path, info)  # Reject a mismatched file before any mutation.
     if args.action == 'doctor':
@@ -472,6 +549,7 @@ def main(argv=None):
         if args.replace_stock_home:
             print('If Home is overridden, allow disabling only these Google Home packages for this profile: ' + ', '.join(GOOGLE_HOMES))
     else:
+        ui.step(4, 'Restore your previous Home')
         print('Restore saved Home and package states.' + (' Also remove Maré and its preferences from this profile.' if args.remove else ' Keep Maré installed.'))
     if args.dry_run:
         print('Dry run complete; no TV configuration or packages changed.')

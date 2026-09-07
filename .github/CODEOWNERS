@@ -1,2 +1,3 @@
-# Enable required code-owner review in the repository's main-branch ruleset.
-* @danielcavalli
+# Membership is restricted to Maré Rio organisation members by GitHub Teams.
+# Keep all launcher maintainers in this team; the native main ruleset enforces it.
+* @mare-rio/launcher-maintainers
