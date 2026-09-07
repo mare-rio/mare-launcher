@@ -28,9 +28,9 @@ Android’s documented wireless pairing support for **TV starts with Android 13*
 
 1. Enable **Wireless debugging** and allow it on your home network.
 2. On its main screen, note the **IP address and port**. This is the **connection address**.
-3. Start the computer installer. Answer yes when asked whether the TV has pairing-code support, and enter that connection address.
+3. Start the computer installer. Answer **y** only if you can open **Pair device with pairing code** on the TV. Enter the connection address as `IP:port`, or enter just the IP and setup asks for the connection port separately.
 4. On the TV choose **Pair device with pairing code**. Keep that screen open.
-5. Enter the **pairing address** shown there when the installer requests it, then the six-digit code. The code is entered privately and is not saved.
+5. Enter the **pairing address** shown there when the installer requests it (the IP and port can also be entered separately), then the six-digit code. The code is entered privately and is not saved.
 
 The pairing port and connection port are different. Pairing authorises your computer; the main-screen address is where it then connects. If the TV closes the pairing screen or the code expires, open a new one and rerun setup. On later updates you normally need only the current connection address.
 
@@ -40,10 +40,12 @@ Many Android 11 televisions expose network ADB through **Network debugging**, **
 
 1. Enable the applicable debugging switch.
 2. Find the TV’s IP address under **Network → your connection**, or **About → Status**.
-3. Enter the IP in the installer. If the TV shows a port, enter `IP:port`; otherwise the installer tries the usual port `5555`.
+3. Answer **n** to the pairing-code question, then enter the IP in the installer. If the TV shows a port, enter `IP:port`; otherwise the installer tries the usual port `5555`.
 4. Accept **Allow debugging?** on the TV for your computer. You can select **Always allow** on a computer you trust.
 
 USB debugging alone does **not** turn on network access on all models. If the connection is refused and the TV has no network option, see the troubleshooting section. The installer cannot create a debugging connection that the firmware does not expose.
+
+If you chose the wrong method, type **back** at any address or port prompt. Setup lets you choose again without restarting. A TV connected through Wi-Fi can still use the Network / ADB / USB debugging method; choose according to the controls on the TV.
 
 ## 2. Run the guided installer
 
@@ -131,6 +133,7 @@ Keep the JSON file. It contains the previous Home and affected package states, n
 
 | What you see | What to do |
 | --- | --- |
+| Your IP is accepted, but setup asks for a port you cannot find | Type **back** and answer **n** if the TV only has a Network / ADB / USB debugging switch. Enter the IP again; setup uses port `5555`. For pairing-code Wireless debugging, use the port printed after the colon on the TV. |
 | Connection refused / timed out | Check the current IP, correct port, TV awake, debugging enabled and guest-network isolation. A VPN or firewall on the computer may block local access. |
 | `unauthorized` | Accept the TV’s debugging prompt. If it never appears, revoke debugging authorisations in Developer options and reconnect; this also revokes other trusted computers. |
 | Pairing succeeds but connection fails | Use the connection port on the main Wireless debugging screen, not the pairing port. |
