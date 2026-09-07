@@ -268,7 +268,7 @@ def load_state(path, info):
 def verify_apk(apk):
     manifest = apk.parent / 'release.json'
     if not apk.is_file() or not manifest.is_file():
-        raise InstallError('Use the complete Maré installation ZIP: the APK and release.json must be together. See README.md.')
+        raise InstallError('Use the complete Maré installation ZIP: the APK and release.json must be together. Open START_HERE.html.')
     info = json.loads(manifest.read_text(encoding='utf-8'))
     if info.get('package') != PACKAGE or info.get('apk') != apk.name or not info.get('signed'):
         raise InstallError('This is not a signed Maré installation bundle.')
@@ -311,7 +311,7 @@ def install(adb, info, apk, state_path, keep_home=False, replace_stock=False, gu
         raise InstallError('This release needs a newer Android version.')
     saved = load_state(state_path, info)
     if saved and saved['phase'] in ('restoring', 'recovery-needed'):
-        raise InstallError('An earlier operation needs recovery. Run the restore command first.')
+        raise InstallError('An earlier operation needs recovery. Open setup and choose Restore first, or use the restore command.')
     if not keep_home and not (saved['previous_home'] if saved and saved['phase'] != 'restored' else info['home']):
         raise InstallError('Choose a default Home in TV settings first so it can be restored later, or use --keep-home.')
     if not saved or saved['phase'] == 'restored':
