@@ -1,0 +1,16 @@
+{
+  "upstream": "mare-rio/mare-design-system",
+  "revision": "f140c8bc86ff06660eed7677a92b70f2f19200e2",
+  "version": "0.3.1",
+  "license": "MIT for the Mar\u00e9-owned copies distributed in this launcher; separate font and React licenses apply. The upstream repository is not relicensed.",
+  "files": {
+    "vendor/mare/components.js": "c8bf8958950551f76f60d4d2226da4aafea62d2f274703fbbc1c647167e0e7d3",
+    "web/vendor/fonts/fraunces-italic.ttf": "b24448c43702fac4ee856781d461a0dfba8d8e594b6e8e190234b75fed2c0e01",
+    "web/vendor/fonts/fraunces.ttf": "177ff6c0f14e5550a3c624247cd1189611d4eb65d000b14944c63d967958abbb",
+    "web/vendor/fonts/geist-mono.ttf": "d00e590b8eb3a59acc329b2d044fd143ae935090b7da33199ebee27cc7de8196",
+    "web/vendor/fonts/inter.ttf": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031",
+    "web/vendor/grain-4k.svg": "82cf5e8f3c12c371ad93526a1351146c6aa28c728c7d34f6ab87b658c58e56ef",
+    "web/vendor/mare.css": "d067353a1b26061ca3e6f6006bac9545239c6185eeedc7548d879228866d2779",
+    "web/vendor/mark.js": "b9cc095532101bfe6249efaf7f6018a49612e83d0a2ce3b62dd2d29185bc905d"
+  }
+}

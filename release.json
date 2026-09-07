@@ -1,0 +1,9 @@
+{
+  "version": "0.3.0",
+  "versionCode": 4,
+  "package": "rio.dan.mare.launcher",
+  "minSdk": 26,
+  "targetSdk": 36,
+  "compileSdk": 36,
+  "buildTools": "36.0.0"
+}

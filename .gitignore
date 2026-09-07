@@ -1,0 +1,11 @@
+node_modules/
+.build/
+dist/
+.evidence/
+__pycache__/
+*.pyc
+*.jks
+*.keystore
+*.p12
+.env
+.env.*

@@ -1,0 +1,143 @@
+/* Maré launcher · redesign 1a · TV adaptation stylesheet
+   Authored for the launcher WebView as measured: 960 × 540 CSS px at devicePixelRatio 2 → the TV's 1920 × 1080 buffer.
+   Every value is exactly half of the buffer-px spec in README.md, so nothing lands between buffer pixels.
+   Colours, faces, materials and component skins come from vendor/mare.css (the published Maré tokens);
+   this file adds geometry, focus and motion only. Class names prefixed tv- are proposals for app.js. */
+
+@font-face{font-family:Fraunces;src:url('vendor/fonts/fraunces.ttf');font-weight:100 900;font-style:normal}
+@font-face{font-family:Fraunces;src:url('vendor/fonts/fraunces-italic.ttf');font-weight:100 900;font-style:italic}
+@font-face{font-family:Inter;src:url('vendor/fonts/inter.ttf');font-weight:100 900;font-style:normal}
+@font-face{font-family:'Geist Mono';src:url('vendor/fonts/geist-mono.ttf');font-weight:100 900;font-style:normal}
+
+/* ── base ─────────────────────────────────────────────────────────────────── */
+html{font-size:16px}                                   /* 1 rem = 16 css px = 32 buffer px; DS controls (.seg/.switch/.menu) size themselves in rem */
+html,body{background:var(--bg);transition:background-color 800ms var(--ease)}
+body{margin:0;overflow:hidden;color:var(--ink);font-family:var(--sans)}
+*{box-sizing:border-box}
+a{text-decoration:none;color:inherit}
+a:focus,button:focus{outline:none}                     /* focus is drawn by the layer indicator, never by an outline */
+button,a{-webkit-tap-highlight-color:transparent}
+/* Same Maré grain function, blend and opacity; explicit 4K texture coordinates (unchanged). */
+body.mare-grain::after{background-image:url('vendor/grain-4k.svg');background-size:100% 100%;background-repeat:no-repeat}
+/* Steady wordmark contrast at sofa distance (unchanged). */
+.mare-block,.mare-wordmark{animation:none;background-position:50% 50%}
+
+/* ── frame ────────────────────────────────────────────────────────────────── */
+.mare-page.mare-page--arrival{position:relative;width:960px;height:540px;min-height:0;padding:0;overflow:hidden}
+.tv-home{position:absolute;inset:0;transition:opacity 400ms var(--ease),transform 400ms var(--ease)}
+.tv-dialog-open .tv-home{opacity:.35;transform:translateX(-16px)}   /* the home dims and slides 32 buffer px; it never unmounts */
+
+/* ── the one focus indicator per layer ─────────────────────────────────────
+   app.js positions it to the focused element's box (getBoundingClientRect relative to the layer).
+   Rows stay transparent; only the name recolours + nudges. */
+.tv-focus{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;background:var(--field);box-shadow:inset 3px 0 var(--sea);opacity:0;
+  transition:left 200ms var(--ease),top 200ms var(--ease),width 200ms var(--ease),height 200ms var(--ease),opacity 200ms var(--ease)}
+.tv-focus.on{opacity:1}
+.tv-focus.underline{height:2px;background:var(--sea);box-shadow:none}   /* nav words: 4 buffer px underline, 4 buffer px under the word box */
+.tv-focus.menu{border-radius:var(--mare-radius-sm)}
+
+/* ── top: wordmark + nav ──────────────────────────────────────────────────── */
+.mare-top{position:absolute;left:48px;right:48px;top:32px;display:flex;align-items:flex-start;justify-content:space-between;gap:32px;padding:0}
+.mare-wordmark{font-size:24px;line-height:1}
+.mare-nav{position:relative;display:flex;align-items:baseline;gap:28px;margin-top:4px}
+.mare-nav-item{position:relative;z-index:1;font-family:var(--mono);font-size:13px;letter-spacing:.08em;text-transform:lowercase;color:var(--ink-soft);padding:3px 1px;transition:color 200ms var(--ease)}
+.mare-nav-item:focus,.mare-nav-item[aria-current="page"]{color:var(--ink)}
+
+/* ── the arrival is the clock ─────────────────────────────────────────────── */
+.tv-time{position:absolute;left:48px;top:80px;text-align:left}
+.tv-time time{display:block;font-family:var(--serif);font-weight:500;font-size:56px;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums;font-variation-settings:'opsz' 24,'SOFT' 30;color:var(--ink)}
+.tv-time span{display:block;margin-top:9px;font-family:var(--mono);font-size:13px;letter-spacing:.06em;white-space:nowrap;color:var(--ink-soft)}
+
+/* ── favourites grid (Mare.AppList / Mare.App) ────────────────────────────── */
+.tv-favorites{position:absolute;left:48px;right:48px;top:190px;z-index:1}
+.tv-favorites .mare-applist{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 32px;margin:0;padding:0;list-style:none}
+.mare-app{position:relative;z-index:1;display:grid;row-gap:4px;align-content:start;column-gap:0;min-height:0;padding:7px 10px 11px 12px;border-bottom:1px solid var(--line);background:none;box-shadow:none;transition:none}
+.mare-app-name{font-family:var(--serif);font-weight:500;font-size:26px;line-height:1.1;letter-spacing:-.02em;font-variation-settings:'opsz' 24,'SOFT' 30;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;color:var(--ink);outline:none!important;transition:color 200ms var(--ease),transform 200ms var(--ease)}
+.mare-app-name::after{content:'';position:absolute;inset:0}          /* whole row is the hit target */
+.mare-app-for{font-size:13px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;color:var(--ink-soft);transition:color 200ms var(--ease)}
+.mare-app:hover .mare-app-name{transform:none}
+.mare-app:focus-within .mare-app-name{color:var(--sea);transform:translateX(3px)}
+.mare-app:focus-within .mare-app-for{color:var(--ink)}
+/* first run: one row where the grid would be */
+.tv-firstrun{position:absolute;left:48px;top:190px;width:472px;z-index:1}
+.tv-firstrun .mare-applist{grid-template-columns:1fr}
+
+/* ── horizon + foot ───────────────────────────────────────────────────────── */
+.mare-horizon{height:130px;min-height:0;opacity:.72}                 /* fixed inside the transformed .tv-home → it dims and slides with the home */
+.mare-page--arrival .mare-foot,.tv-panel-foot{position:absolute;left:48px;right:48px;bottom:32px;z-index:2;display:flex;justify-content:space-between;gap:24px;margin:0;font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--ink-soft)}
+.mare-foot span,.tv-panel-foot span{white-space:nowrap}
+
+/* ── pane: apps / inputs / settings rise over the home ────────────────────── */
+.tv-panel{position:absolute;top:0;bottom:0;left:256px;width:704px;z-index:5;display:flex;flex-direction:column;padding:32px 48px 0 36px;background:var(--bg);border-left:1px solid var(--line);
+  opacity:0;transform:translateX(24px);visibility:hidden;transition:opacity 400ms var(--ease),transform 400ms var(--ease),visibility 0s linear 400ms}
+.tv-panel.open{opacity:1;transform:none;visibility:visible;transition:opacity 400ms var(--ease),transform 400ms var(--ease),visibility 0s}
+.tv-panel-top{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:0 0 11px;border-bottom:1px solid var(--line)}
+.tv-panel h2{margin:0;font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.1;letter-spacing:-.02em;font-variation-settings:'opsz' 24,'SOFT' 30;color:var(--ink)}
+.tv-panel-meta{font-family:var(--mono);font-size:12px;letter-spacing:.06em;white-space:nowrap;color:var(--ink-soft)}
+.tv-panel .tv-panel-foot{position:static;margin-top:auto;padding:0 0 32px}
+.tv-panel-empty{margin:12px 0 0;font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--ink-soft)}
+
+/* generic row used by the three panes */
+.tv-rows{position:relative;margin:12px 0 0;padding:0;list-style:none;display:grid}
+.tv-row{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line)}
+.tv-row-name{font-family:var(--serif);font-weight:500;line-height:1.1;letter-spacing:-.02em;font-variation-settings:'opsz' 24,'SOFT' 30;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink);transition:color 200ms var(--ease),transform 200ms var(--ease)}
+.tv-row:focus-within .tv-row-name,.tv-row:focus-within .tv-row-label{color:var(--sea)}
+.tv-row:focus-within .tv-row-name{transform:translateX(3px)}
+.tv-row-value{font-family:var(--mono);font-size:12px;letter-spacing:.06em;white-space:nowrap;color:var(--ink-soft)}
+
+/* apps — one surface, a–z down each column, 11 rows visible, translateY scroll */
+.tv-library-clip{flex:1;overflow:hidden;margin-top:12px}
+.tv-library{position:relative;margin:0;padding:0;list-style:none;display:grid;grid-auto-flow:column;grid-template-rows:repeat(var(--rows,10),35px);grid-template-columns:repeat(4,minmax(0,1fr));column-gap:20px;transition:transform 400ms var(--ease)}
+.tv-library .tv-row{height:35px;padding:0 8px 0 10px;gap:8px}
+.tv-library .tv-row-name{font-size:19px}
+.tv-pin{flex:none;width:6px;height:6px;background:var(--sea);opacity:0}   /* the system's own mark: on home */
+.tv-row.pinned .tv-pin{opacity:1}
+
+/* inputs — state is a word */
+.tv-inputs .tv-row{height:40px;padding:0 10px 0 12px}
+.tv-inputs .tv-row-name{font-size:22px}
+.tv-inputs .tv-row.connected .tv-row-value{color:var(--sea)}
+.tv-inputs .tv-row.disconnected{opacity:.55}
+
+/* settings — controls take the ring; left / right change them in place */
+.tv-settings .tv-row{height:42px;padding:0 10px 0 12px}
+.tv-row-label{font-size:16px;line-height:1.2;white-space:nowrap;color:var(--ink);transition:color 200ms var(--ease)}
+.tv-settings .seg,.tv-settings .switch{transition:box-shadow 200ms var(--ease)}   /* DS controls at their native size: on the dpr-2 WebView that is already the TV size */
+.tv-settings .tv-row:focus-within .seg,.tv-settings .tv-row:focus-within .switch{box-shadow:0 0 0 2px var(--bg),0 0 0 3px var(--sea)}
+
+/* ── options menu: unfolds from its row ───────────────────────────────────── */
+.tv-menu.menu{position:absolute;min-width:260px;padding:5px;display:grid;gap:1px;transform-origin:0 0;
+  opacity:0;transform:scale(.97);visibility:hidden;transition:opacity 200ms var(--ease),transform 200ms var(--ease),visibility 0s linear 200ms}
+.tv-menu.open{opacity:1;transform:none;visibility:visible;transition:opacity 200ms var(--ease),transform 200ms var(--ease),visibility 0s}
+.tv-menu-title{padding:4px 11px 6px;font-family:var(--serif);font-weight:500;font-size:17px;line-height:1.1;letter-spacing:-.02em;font-variation-settings:'opsz' 24,'SOFT' 30;color:var(--ink)}
+.tv-menu .menu-item{position:relative;z-index:1;font-size:15px;padding:7px 11px;background:none;color:var(--ink);transition:color 200ms var(--ease)}
+.tv-menu .menu-item:focus,.tv-menu .menu-item:hover{background:none;color:var(--sea)}
+.tv-menu .menu-item .k{font-size:11px;letter-spacing:.06em}
+.tv-menu .menu-sep{margin:4px 6px}
+
+/* ── toast ────────────────────────────────────────────────────────────────── */
+.toast{position:absolute;bottom:64px;font-size:14px;padding:9px 14px;gap:10px}
+.toast .tk{font-size:11px}
+
+/* ── stillness ────────────────────────────────────────────────────────────── */
+.tv-still *{animation:none!important;transition:none!important}
+.tv-still .mare-wordmark,.tv-still .mare-block{background-position:50% 50%}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* Integration with the published React primitives; geometry above is the handoff. */
+.mare-app{grid-template-columns:minmax(0,1fr)}
+.tv-firstrun{right:auto}
+.tv-firstrun .mare-applist{grid-template-columns:1fr}
+.tv-focus{list-style:none;margin:0;padding:0;border:0;z-index:0}
+.tv-focus.menu-focus{border-radius:var(--mare-radius-sm)}
+.tv-row,.tv-panel{outline:none}
+.tv-row{cursor:pointer}
+.tv-row-name{min-width:0}
+.tv-library-clip{flex:0 1 385px;min-height:0}
+.tv-menu{z-index:40}
+.tv-menu .menu-item{display:flex;align-items:center;justify-content:space-between;gap:20px;cursor:pointer;font-family:var(--sans);border:0;text-align:left}
+.tv-menu .menu-sep{height:1px;background:var(--line)}
+.tv-still{transition:none!important}
+
+/* Fit the same reference layout to the TV viewport without changing OS density. */
+#root{position:absolute;width:960px;height:540px;left:50%;top:50%;transform:translate(-50%,-50%) scale(var(--tv-scale,1));transform-origin:center}
