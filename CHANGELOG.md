@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1 — 6 October 2026
+
+- Inputs: a shorter footer, so the pin hint fits beside it on a 1080p TV.
+
 ## 0.4.0 — 6 October 2026
 
 - Signed with a new, public key (signing/README.md): the earlier private key was lost. A TV running 0.3.3 or earlier reinstalls once: restore the previous Home with removal, then install.
