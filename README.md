@@ -22,7 +22,7 @@ For **Android TV 8 or newer / Google TV**. TCL Roku TVs cannot run Android APKs.
 
 ## Make it yours
 
-Pin up to twelve favourites. Choose day or night colours, and turn **Motion** off for a simpler experience on slower TVs. The remote’s arrow keys and OK do everything; hold OK on an app to pin, move or remove it from Home. Dates use day–month order and the clock uses 24-hour time.
+Pin up to twelve favourites: apps, or TV inputs such as an HDMI device, shown with the name your TV gives the input. Choose day or night colours, and turn **Motion** off for a simpler experience on slower TVs. The remote’s arrow keys and OK do everything; hold OK on an app or input to pin, move or remove it from Home. Dates use day–month order and the clock uses 24-hour time.
 
 Maré has no accounts, tracking or internet permission. It removes home-screen recommendations and ads; advertising inside other apps is unaffected. To go back, run the same installer and choose **Restore my previous Home screen**.
 
