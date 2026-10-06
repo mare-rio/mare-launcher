@@ -42,35 +42,17 @@ The ordinary installer’s verification and recovery rules apply. Add `--replace
 
 ## Production build
 
-Commit the reviewed source first, and use a clean working tree. Run the build in an environment without release credentials:
+Commit the reviewed source first, and use a clean working tree:
 
 ```sh
 python3 scripts/build.py
 python3 scripts/check_apk.py
-```
-
-This creates `dist/mare-launcher-unsigned.apk`, `dist/release.json` and `dist/SHA256SUMS`. The checker inspects the binary manifest, exact permission set, fonts, licences, APK digest and source hashes. Provenance records the source revision and whether the tree was dirty. Versions and SDK levels are managed in root `release.json`; keep `package.json` and its lockfile version aligned.
-
-Dependencies are pinned, but byte-for-byte reproducibility of APK ZIP timestamps has not been established. Use the recorded digest to identify the exact candidate. A rebuild can produce a different digest.
-
-## Separate local signing
-
-Production APKs are signed locally and published through GitHub Releases. Do not upload a keystore or password to Actions. Keep the release signing identity backed up privately: Android updates depend on retaining it. The 0.3.0 release retains the signing identity used by the existing Maré previews.
-
-Use a trusted copy of the signing helper and Android SDK in a signing environment that does not execute contributor build code. Transfer the reviewed unsigned APK with its matching `release.json`; independently record the approved unsigned SHA-256. Set `MARE_KEYSTORE_PASSWORD` privately in that environment, then run:
-
-```sh
-python3 scripts/sign.py --apk dist/mare-launcher-unsigned.apk --expected-sha256 APPROVED_UNSIGNED_SHA256 --keystore /private/path/mare-launcher.jks --key-alias mare-launcher
-```
-
-Unset the password afterwards. The helper produces `dist/mare-launcher.apk`, verifies its signature and updates the adjacent metadata and checksum. It does not run a build or upload anything. `--build-tools` chooses the trusted installed signer version; `--password-env` can name a different password variable.
-
-Bring the signed artifact back to the clean reviewed checkout and inspect/package it:
-
-```sh
-python3 scripts/check_apk.py
 python3 scripts/package_release.py
 ```
+
+This creates `dist/mare-launcher.apk`, signed with the project's public key ([signing/README.md](../signing/README.md)), with `dist/release.json` and `dist/SHA256SUMS`. The checker inspects the binary manifest, exact permission set, fonts, licences, APK digest, signature and source hashes. CI's `android` job keeps the same checked APK, `release.json` and `SHA256SUMS` as the `mare-launcher` artifact of the exact commit.
+
+Dependencies are pinned, but byte-for-byte reproducibility of APK ZIP timestamps has not been established. Use the recorded digest to identify the exact candidate.
 
 The `dist/mare-launcher-install.zip` bundle contains the signed production APK, guided installer, platform-tool pins, installation/compatibility guides, notices and checksums. Contributor documentation stays in the source repository. It excludes source workspaces, keys, device evidence and CI credentials. Packaging rejects unsigned/debug APKs and builds from dirty or uncommitted trees. Output stays in ignored `dist/`; no tool in this repository publishes a release.
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0 — 6 October 2026
+
+- Signed with a new, public key (signing/README.md): the earlier private key was lost. A TV running 0.3.3 or earlier reinstalls once: restore the previous Home with removal, then install.
+- Pin a TV input to Home: hold OK on an input in Inputs (or press Menu) and choose Pin to home. Its tile shows the name the TV gives the input, such as a device's custom HDMI label, and OK switches to it. Pinned inputs share the twelve places with apps and move like them.
+
 ## 0.3.1 — 7 September 2026
 
 - Put guided setup entirely in the terminal, with coloured panels, numbered steps, TV preparation prompts and plain-output support.

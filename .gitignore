@@ -9,3 +9,5 @@ __pycache__/
 *.p12
 .env
 .env.*
+# The project signing key is public by design (signing/README.md).
+!signing/mare-launcher.p12

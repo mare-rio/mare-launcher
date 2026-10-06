@@ -54,7 +54,17 @@ jobs:
       - name: Install pinned Android SDK components
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"
-      - name: Build unsigned production APK
+      - name: Build production APK
         run: python3 scripts/build.py
       - name: Check production APK
         run: python3 scripts/check_apk.py
+      # The checked APK, signed with the project's public key (signing/README.md).
+      - name: Keep the production APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mare-launcher
+          path: |
+            dist/mare-launcher.apk
+            dist/release.json
+            dist/SHA256SUMS
+          if-no-files-found: error

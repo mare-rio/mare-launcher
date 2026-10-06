@@ -68,10 +68,13 @@ def main():
     with zipfile.ZipFile(out / 'unsigned.apk', 'a') as archive:
         archive.write(out / 'dex/classes.dex', 'classes.dex')
     run([bt / ('zipalign' + suffix), '-f', '4', out / 'unsigned.apk', out / 'aligned.apk'])
-    key = None
-    alias = 'mare-development'
-    password_env = 'MARE_DEVELOPMENT_PASSWORD'
+    # A production APK is signed with the project's public key (signing/README.md): Android requires a
+    # signature and ties updates to it, and installing needs ADB on the TV's own network anyway.
+    key = ROOT / 'signing/mare-launcher.p12'
+    alias = 'mare-launcher'
+    password_env = 'MARE_LAUNCHER_PASSWORD'
     env = os.environ.copy()
+    env[password_env] = 'mare-launcher'
     if args.debug:
         key = ROOT / '.build/development.jks'
         alias = 'mare-development'
@@ -81,11 +84,9 @@ def main():
                  '-keypass:env', password_env, '-alias', alias, '-dname', 'CN=Mare development',
                  '-keyalg', 'RSA', '-validity', '3650', '-noprompt'], env=env)
             key.chmod(0o600)
-    apk = dist / ('mare-launcher-debug.apk' if args.debug else 'mare-launcher-unsigned.apk')
+    apk = dist / ('mare-launcher-debug.apk' if args.debug else 'mare-launcher.apk')
     certificate = None
     if key:
-        if not env.get(password_env):
-            parser.error('Set the password environment variable before signing; never put passwords in command arguments.')
         run([bt / ('apksigner' + script_suffix), 'sign', '--ks', key.resolve(), '--ks-key-alias', alias,
              '--ks-pass', 'env:' + password_env, '--key-pass', 'env:' + password_env,
              '--out', apk, out / 'aligned.apk'], env=env)

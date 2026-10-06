@@ -24,7 +24,9 @@
     settings:p=>window.lastAction=['settings',p], exit:()=>window.lastAction=['exit']
   };
   let data=JSON.parse(bridge.catalog()), pref=JSON.parse(bridge.preferences());
-  const clean = list => [...new Set(list)].filter(p=>data.apps.some(a=>a.package===p)).slice(0,LIMIT);
+  // A favourite is an app's package, or a TV input as "input:<id>" (an HDMI device pinned to Home).
+  const inputOf=p=>typeof p==='string'&&p.startsWith('input:')?data.inputs.find(i=>'input:'+i.id===p):undefined;
+  const clean = list => [...new Set(list)].filter(p=>inputOf(p)||data.apps.some(a=>a.package===p)).slice(0,LIMIT);
   let favorites=clean(pref.favorites||[]), theme=pref.theme==='day'?'day':'night', motion=pref.motion!==false;
   let pane=null, paneView='apps', paneReturn=null, menu=null, menuView=null, menuReturn=null;
   let focusId=null, libScroll=0, toast=null, toastTimer, held=null;
@@ -34,6 +36,10 @@
   const purpose=a=>(names[a.package]||[null,a.tv?'TV app':'Android app'])[1];
   const sorted=()=>data.apps.slice().sort((a,b)=>appName(a).localeCompare(appName(b),'en-GB'));
   const app=p=>data.apps.find(a=>a.package===p);
+  // What a favourite or menu key names: an app, or an input shown with the TV's own name for it.
+  const entry=p=>{const i=inputOf(p);return i?{package:p,name:i.name,input:i}:app(p);};
+  const entryName=e=>e.input?e.input.name:appName(e);
+  const entryPurpose=e=>e.input?(e.input.label&&e.input.label!==e.input.name?e.input.label.toLowerCase()+' · input':'input'):purpose(e);
   const homeFirst=()=>favorites.length?'app:'+favorites[0]:'first:run';
   const network=()=>bridge.network().toLocaleLowerCase('en-GB');
   const scope=()=>menu?'menu':pane?'pane':'home';
@@ -73,7 +79,7 @@
   }
   function closePane(){cancelHold();menu=null;pane=null;render();focus(paneReturn);}
   function openMenu(pkg){
-    if(!app(pkg))return;cancelHold();menuReturn=focusId;menu=menuView=pkg;render();placeMenu();focus('mi:open');
+    if(!entry(pkg))return;cancelHold();menuReturn=focusId;menu=menuView=pkg;render();placeMenu();focus('mi:open');
   }
   function closeMenu(){cancelHold();menu=null;render();focus(menuReturn);}
   function placeMenu(){
@@ -94,6 +100,7 @@
   function changeMotion(next){motion=next;bridge.save('motion',String(motion));render();focus(focusId);}
   function activate(id){
     if(!id)return;
+    if(id.startsWith('app:input:'))return bridge.input(id.slice(10));
     if(id.startsWith('app:')||id.startsWith('lib:'))return bridge.launch(id.slice(4));
     if(id.startsWith('input:'))return bridge.input(id.slice(6));
     if(id.startsWith('nav:'))return openPane(id.slice(4));
@@ -102,9 +109,11 @@
     if(id==='set:motion')return changeMotion(!motion);
     if(id.startsWith('set:'))return bridge.settings(id.slice(4));
     if(!menu||!id.startsWith('mi:'))return;
-    const pkg=menu, name=appName(app(pkg)), index=favorites.indexOf(pkg);
+    const pkg=menu, name=entryName(entry(pkg)), index=favorites.indexOf(pkg);
     if(id==='mi:open'||id==='mi:info'){
-      closeMenu();return id==='mi:open'?bridge.launch(pkg):bridge.appInfo(pkg);
+      closeMenu();
+      if(inputOf(pkg))return id==='mi:open'?bridge.input(pkg.slice(6)):undefined;
+      return id==='mi:open'?bridge.launch(pkg):bridge.appInfo(pkg);
     }
     if(id==='mi:pin'){
       if(index<0&&favorites.length===LIMIT)return notify('All 12 places are taken · unpin a favourite first','full');
@@ -147,6 +156,7 @@
       press.timer=setTimeout(()=>{
         if(held!==press)return;press.long=true;
         if(menu)closeMenu();else if(press.id?.startsWith('app:')||press.id?.startsWith('lib:'))openMenu(press.id.slice(4));
+        else if(press.id?.startsWith('input:'))openMenu(press.id);
         // Preserve the consumed press after opening/closing a menu until key-up.
         held=press;
       },HOLD);return;
@@ -157,7 +167,7 @@
     cancelHold();
     if(['left','right','up','down'].includes(key))navigate(key);
     else if(key==='back'){if(menu)closeMenu();else if(pane)closePane();else bridge.exit();}
-    else if(key==='menu'){if(menu)closeMenu();else if(focusId?.startsWith('app:')||focusId?.startsWith('lib:'))openMenu(focusId.slice(4));else openPane('apps');}
+    else if(key==='menu'){if(menu)closeMenu();else if(focusId?.startsWith('app:')||focusId?.startsWith('lib:'))openMenu(focusId.slice(4));else if(focusId?.startsWith('input:'))openMenu(focusId);else openPane('apps');}
     else if(key==='source'){if(pane==='inputs')closePane();else openPane('inputs');}
     else if(key==='home')window.launcherHome();
   };
@@ -165,7 +175,7 @@
   window.refreshTV=()=>{
     cancelHold();data=JSON.parse(bridge.catalog());pref=JSON.parse(bridge.preferences());favorites=clean(pref.favorites||favorites);
     theme=pref.theme==='day'?'day':'night';motion=pref.motion!==false;
-    if(menu&&!app(menu))menu=null;
+    if(menu&&!entry(menu))menu=null;
     libScroll=Math.max(0,Math.min(libScroll,Math.ceil(data.apps.length/4)-LIB_ROWS));render();focus(focusId);
   };
   const keys={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down',Enter:'enter',Escape:'back',ContextMenu:'menu',TVInput:'source',F2:'source'};
@@ -200,12 +210,12 @@
       setting('favourites','Favourites',h('span',{key:'value',className:'tv-row-value'},`${favorites.length} of 12 on home · organise`)));
   }
   function menuContent(){
-    const a=app(menuView);if(!a)return null;const i=favorites.indexOf(a.package);
+    const a=entry(menuView);if(!a)return null;const i=favorites.indexOf(a.package);
     const item=(id,label,hint)=>h('button',{key:id,className:'menu-item',role:'menuitem',tabIndex:-1,'data-f':'mi:'+id},label,h('span',{className:'k'},hint));
-    return [h('div',{key:'title',className:'tv-menu-title'},appName(a)),h('div',{key:'focus',className:'tv-focus menu-focus','aria-hidden':true}),
+    return [h('div',{key:'title',className:'tv-menu-title'},entryName(a)),h('div',{key:'focus',className:'tv-focus menu-focus','aria-hidden':true}),
       item('open','Open','ok'),item('pin',i>=0?'Unpin from home':'Pin to home',`${favorites.length} / 12`),
       i>0?item('up','Move up','↑'):null,i>=0&&i<favorites.length-1?item('down','Move down','↓'):null,
-      h('div',{key:'sep',className:'menu-sep',role:'separator'}),item('info','App info','android ↗')];
+      ...(a.input?[]:[h('div',{key:'sep',className:'menu-sep',role:'separator'}),item('info','App info','android ↗')])];
   }
   function render(){
     document.documentElement.dataset.theme=theme;
@@ -217,18 +227,18 @@
     const inputMeta=[data.inputs.filter(i=>i.type===1007).length+' hdmi',...(data.inputs.some(i=>i.type===1001)?['av']:[]),...(data.inputs.some(i=>i.type===0)?['tuner']:[])].join(' · ');
     const meta=paneView==='apps'?`${data.apps.length} apps · a–z`:paneView==='inputs'?inputMeta:'appearance · motion · connections';
     const footLeft=paneView==='apps'?`${favorites.length} of 12 on home`:paneView==='inputs'?'input key behaviour depends on your TV':`maré launcher ${bridge.version?bridge.version():'0.3.0'}`;
-    const footRight=paneView==='apps'?'ok opens · hold ok to pin · back closes':paneView==='inputs'?'ok switches · back closes':'left / right changes · back closes';
+    const footRight=paneView==='apps'?'ok opens · hold ok to pin · back closes':paneView==='inputs'?'ok switches · hold ok to pin · back closes':'left / right changes · back closes';
     ReactDOM.flushSync(()=>root.render(h(Mare.Page,{variant:'arrival'},
       h('div',{className:'tv-home','data-scope':'home','aria-hidden':!!pane||!!menu},
         h(Mare.TopBar,null,h(Mare.Wordmark,{href:'#home'}),h(Mare.Nav,null,...['apps','inputs','settings'].map(p=>h(Mare.NavItem,{key:p,href:'nav:'+p,current:pane===p},p)),h('span',{className:'tv-focus underline','aria-hidden':true}))),
         h('section',{className:'tv-time','aria-label':date},h('time',null,time),h('span',null,date)),
-        h('section',{className:'tv-favorites'+(!favorites.length?' tv-firstrun':''),'aria-label':'Favourites'},h(Mare.AppList,null,indicator(),...(favorites.length?favorites.map(p=>h(Mare.App,{key:p,name:appName(app(p)),purpose:purpose(app(p)),href:'app:'+p})):[h(Mare.App,{key:'first',name:'Choose your favourites',purpose:`${data.apps.length} apps installed · hold ok on any app to pin it`,href:'first:run'})]))),
+        h('section',{className:'tv-favorites'+(!favorites.length?' tv-firstrun':''),'aria-label':'Favourites'},h(Mare.AppList,null,indicator(),...(favorites.length?favorites.map(p=>h(Mare.App,{key:p,name:entryName(entry(p)),purpose:entryPurpose(entry(p)),href:'app:'+p})):[h(Mare.App,{key:'first',name:'Choose your favourites',purpose:`${data.apps.length} apps installed · hold ok on any app to pin it`,href:'first:run'})]))),
         !still?h(Mare.HorizonMark):null,
         h(Mare.Foot,{left:network(),right:menu?'back closes':favorites.length?'ok opens · hold ok for options · source for inputs':'ok chooses · source for inputs'})),
       h('section',{className:'tv-panel'+(pane?' open':''),'data-scope':'pane',role:pane?'dialog':undefined,'aria-modal':pane?'true':undefined,'aria-hidden':!pane||!!menu,'aria-label':titles[paneView],tabIndex:-1},
         h('header',{className:'tv-panel-top'},h('h2',null,titles[paneView]),h('span',{className:'tv-panel-meta'},meta)),panelContent(),
         h('footer',{className:'tv-panel-foot'},h('span',null,footLeft),h('span',null,footRight))),
-      h('div',{className:'tv-menu menu'+(menu?' open':''),'data-scope':'menu','data-layer':'menu',role:'menu','aria-label':menuView&&app(menuView)?appName(app(menuView))+' options':'App options','aria-hidden':!menu},menuContent()),
+      h('div',{className:'tv-menu menu'+(menu?' open':''),'data-scope':'menu','data-layer':'menu',role:'menu','aria-label':menuView&&entry(menuView)?entryName(entry(menuView))+' options':'App options','aria-hidden':!menu},menuContent()),
       h('div',{className:'toast'+(toast?' show':''),role:'status','aria-live':'polite'},toast?h(React.Fragment,null,h('span',{className:'tk'},toast.kind),h('span',null,toast.text)):null))));
     // The published primitives intentionally expose a small prop API. Decorate their links here.
     for(const e of document.querySelectorAll('a[href]')){const id=e.getAttribute('href');if(id!=='#home')e.dataset.f=id;else e.tabIndex=-1;}

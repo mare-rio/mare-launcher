@@ -206,7 +206,9 @@ public class LauncherActivity extends Activity {
                     JSONArray proposed = new JSONArray(value), valid = new JSONArray(); Set<String> unique = new HashSet<>();
                     for (int i=0; i<proposed.length() && valid.length()<12; i++) {
                         String pkg = proposed.getString(i);
-                        if (packages.contains(pkg) && unique.add(pkg)) valid.put(pkg);
+                        // A favourite is an app's package, or a TV input pinned as "input:<id>".
+                        boolean known = pkg.startsWith("input:") ? inputs.contains(pkg.substring(6)) : packages.contains(pkg);
+                        if (known && unique.add(pkg)) valid.put(pkg);
                     }
                     prefs.edit().putString(key, valid.toString()).apply();
                 } catch (Exception ignored) {}
