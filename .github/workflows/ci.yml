@@ -58,3 +58,13 @@ jobs:
         run: python3 scripts/build.py
       - name: Check production APK
         run: python3 scripts/check_apk.py
+      # The checked unsigned APK, for separate local signing (docs/BUILDING.md); no credentials here.
+      - name: Keep the unsigned production APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mare-launcher-unsigned
+          path: |
+            dist/mare-launcher-unsigned.apk
+            dist/release.json
+            dist/SHA256SUMS
+          if-no-files-found: error

@@ -55,6 +55,10 @@ Dependencies are pinned, but byte-for-byte reproducibility of APK ZIP timestamps
 
 ## Separate local signing
 
+CI's `android` job keeps the checked unsigned APK with its `release.json` and `SHA256SUMS` as the
+`mare-launcher-unsigned` artifact of the exact commit, so a release can be signed from it without a
+local SDK build.
+
 Production APKs are signed locally and published through GitHub Releases. Do not upload a keystore or password to Actions. Keep the release signing identity backed up privately: Android updates depend on retaining it. The 0.3.0 release retains the signing identity used by the existing Maré previews.
 
 Use a trusted copy of the signing helper and Android SDK in a signing environment that does not execute contributor build code. Transfer the reviewed unsigned APK with its matching `release.json`; independently record the approved unsigned SHA-256. Set `MARE_KEYSTORE_PASSWORD` privately in that environment, then run:
