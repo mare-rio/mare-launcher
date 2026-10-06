@@ -226,7 +226,7 @@
     const titles={apps:'Apps',inputs:'Inputs',settings:'Settings'};
     const inputMeta=[data.inputs.filter(i=>i.type===1007).length+' hdmi',...(data.inputs.some(i=>i.type===1001)?['av']:[]),...(data.inputs.some(i=>i.type===0)?['tuner']:[])].join(' · ');
     const meta=paneView==='apps'?`${data.apps.length} apps · a–z`:paneView==='inputs'?inputMeta:'appearance · motion · connections';
-    const footLeft=paneView==='apps'?`${favorites.length} of 12 on home`:paneView==='inputs'?'input key behaviour depends on your TV':`maré launcher ${bridge.version?bridge.version():'0.3.0'}`;
+    const footLeft=paneView==='apps'?`${favorites.length} of 12 on home`:paneView==='inputs'?'input key depends on the TV':`maré launcher ${bridge.version?bridge.version():'0.3.0'}`;
     const footRight=paneView==='apps'?'ok opens · hold ok to pin · back closes':paneView==='inputs'?'ok switches · hold ok to pin · back closes':'left / right changes · back closes';
     ReactDOM.flushSync(()=>root.render(h(Mare.Page,{variant:'arrival'},
       h('div',{className:'tv-home','data-scope':'home','aria-hidden':!!pane||!!menu},
