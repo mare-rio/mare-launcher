@@ -1,6 +1,6 @@
 # CI and contributor trust
 
-The workflow runs tests and builds an **unsigned** APK on GitHub-hosted runners. It has no signing, publishing or deployment job. Installable APKs and installer ZIPs are signed and published locally after release validation; contributor workflows never receive the signing key.
+The workflow runs tests and builds the APK on GitHub-hosted runners, signed with the project's public key ([signing/README.md](../signing/README.md)). It has no secret, publishing or deployment job. Installable APKs and installer ZIPs are signed and published locally after release validation; contributor workflows never receive the signing key.
 
 ## What malicious code can access
 
@@ -33,10 +33,6 @@ The policy test catches accidental drift in this workflow. A malicious contribut
 
 Inspect inherited organisation settings again before switching a repository between private and public. Do not copy another Maré application’s deployment pipeline into this project.
 
-## Signing without giving CI the key
+## Signing
 
-Build and inspect the exact source revision in an environment with no signing credentials or production access. Check the resulting APK and record its SHA-256. Move that reviewed APK to a trusted signing environment, then use a previously reviewed copy of `scripts/sign.py`. The helper verifies the approved digest, invokes an explicitly selected local Android SDK signer, and never builds the project. It does not choose executable paths from artifact metadata.
-
-The signing key stays outside the checkout. Pass its password through an environment variable to the signer, never command arguments, and unset it afterwards. Do not build or run contributor code while the password is present. Environment variables are not protection against code already running as the same user; an isolated signing account or offline machine provides a stronger boundary.
-
-Manual signing still depends on the integrity of the signing helper, Android SDK, operating system and reviewed APK. A digest confirms identity, not whether the code is safe. The final APK and installation ZIP need owner review before any manual publication.
+The signing key is committed and public on purpose ([signing/README.md](../signing/README.md)): installing the launcher needs ADB from the TV's own network, so a private key protected nothing, and losing one stranded every installed TV. A signature here identifies the project's builds to Android's updater; trust in a build comes from reviewing its source revision and recorded digest. Publication remains a deliberate owner step.
