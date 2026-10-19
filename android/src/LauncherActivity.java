@@ -6,7 +6,6 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.ResolveInfo;
-import android.media.tv.TvContract;
 import android.media.tv.TvInputInfo;
 import android.media.tv.TvInputManager;
 import android.net.ConnectivityManager;
@@ -187,6 +186,17 @@ public class LauncherActivity extends Activity {
         catch (Exception e) { Toast.makeText(this, "Unable to open. Please use TV settings.", Toast.LENGTH_LONG).show(); }
     }
 
+    /** Whether Android has the remote-buttons service on (the person turns it on in accessibility settings). */
+    private boolean buttonsOn() {
+        String on = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        if (on == null) return false;
+        for (String service : on.split(":")) {
+            android.content.ComponentName name = android.content.ComponentName.unflattenFromString(service);
+            if (name != null && name.getPackageName().equals(getPackageName()) && name.getClassName().equals(RemoteButtons.class.getName())) return true;
+        }
+        return false;
+    }
+
     private class Bridge {
         @JavascriptInterface public String catalog() { return catalog; }
         @JavascriptInterface public String version() {
@@ -217,9 +227,7 @@ public class LauncherActivity extends Activity {
         @JavascriptInterface public void launch(String pkg) {
             if (!packages.contains(pkg)) return;
             runOnUiThread(() -> {
-                PackageManager pm = getPackageManager();
-                Intent intent = pm.getLeanbackLaunchIntentForPackage(pkg);
-                if (intent == null) intent = pm.getLaunchIntentForPackage(pkg);
+                Intent intent = Targets.app(getPackageManager(), pkg);
                 if (intent != null) open(intent);
             });
         }
@@ -229,19 +237,45 @@ public class LauncherActivity extends Activity {
         @JavascriptInterface public void input(String id) {
             if (!inputs.contains(id)) return;
             runOnUiThread(() -> {
-                TvInputManager manager = (TvInputManager)getSystemService(TV_INPUT_SERVICE);
-                TvInputInfo input = manager == null ? null : manager.getTvInputInfo(id);
-                if (input == null) return;
-                Intent intent = input.isPassthroughInput()
-                    ? new Intent(Intent.ACTION_VIEW).setDataAndType(TvContract.buildChannelUriForPassthroughInput(id), TvContract.Channels.CONTENT_ITEM_TYPE)
-                    : new Intent(Intent.ACTION_VIEW).setDataAndType(TvContract.buildChannelsUriForInput(id), TvContract.Channels.CONTENT_TYPE);
-                if (intent.resolveActivity(getPackageManager()) != null) open(intent);
+                Intent intent = Targets.input(LauncherActivity.this, id);
+                if (intent != null) open(intent);
                 else Toast.makeText(LauncherActivity.this, "Use your TV remote’s Input or Live TV button.", Toast.LENGTH_LONG).show();
             });
         }
+        /** Remote buttons: whether the service is on, and each assigned button's name and target. */
+        @JavascriptInterface public String buttons() {
+            try {
+                JSONObject stored = RemoteButtons.assigned(prefs), assigned = new JSONObject();
+                for (Iterator<String> codes = stored.keys(); codes.hasNext();) {
+                    String code = codes.next();
+                    assigned.put(code, new JSONObject().put("target", stored.getString(code)).put("name", RemoteButtons.name(Integer.parseInt(code))));
+                }
+                return new JSONObject().put("on", buttonsOn()).put("assigned", assigned).toString();
+            } catch (Exception e) { return "{\"on\":false,\"assigned\":{}}"; }
+        }
+        @JavascriptInterface public void assign(String code, String target) {
+            int key;
+            try { key = Integer.parseInt(code); } catch (NumberFormatException e) { return; }
+            boolean known = target.startsWith("input:") ? inputs.contains(target.substring(6)) : target.startsWith("app:") && packages.contains(target.substring(4));
+            if (!known || !RemoteButtons.assignable(key)) return;
+            try { prefs.edit().putString("buttons", RemoteButtons.assigned(prefs).put(String.valueOf(key), target).toString()).apply(); } catch (Exception ignored) {}
+        }
+        @JavascriptInterface public void unassign(String code) {
+            JSONObject assigned = RemoteButtons.assigned(prefs); assigned.remove(code);
+            prefs.edit().putString("buttons", assigned.toString()).apply();
+        }
+        /** The next assignable press goes to the page (window.buttonPressed) instead of to its target. */
+        @JavascriptInterface public void listen() {
+            RemoteButtons.listener = (code, name) -> runOnUiThread(() -> {
+                RemoteButtons.listener = null;
+                if (ready && web != null) web.evaluateJavascript("window.buttonPressed && window.buttonPressed(" + code + "," + JSONObject.quote(name) + ")", null);
+            });
+        }
+        @JavascriptInterface public void stopListening() { RemoteButtons.listener = null; }
         @JavascriptInterface public void settings(String page) {
             runOnUiThread(() -> {
-                String action = page.equals("network") ? Settings.ACTION_WIFI_SETTINGS : page.equals("bluetooth") ? Settings.ACTION_BLUETOOTH_SETTINGS : Settings.ACTION_SETTINGS;
+                String action = page.equals("network") ? Settings.ACTION_WIFI_SETTINGS : page.equals("bluetooth") ? Settings.ACTION_BLUETOOTH_SETTINGS
+                    : page.equals("accessibility") ? Settings.ACTION_ACCESSIBILITY_SETTINGS : Settings.ACTION_SETTINGS;
                 Intent intent = new Intent(action);
                 if (intent.resolveActivity(getPackageManager()) == null) intent = new Intent(Settings.ACTION_SETTINGS);
                 open(intent);
@@ -293,7 +327,9 @@ public class LauncherActivity extends Activity {
         }
     }
     @Override protected void onPause() {
+        RemoteButtons.listener = null;
         if (web != null) {
+            web.evaluateJavascript("window.stopListening && window.stopListening()", null);
             web.evaluateJavascript("window.cancelRemoteHold && window.cancelRemoteHold()", null);
             web.onPause(); web.pauseTimers();
         }

@@ -63,8 +63,9 @@ def main():
     run([bt / ('d8' + script_suffix), '--min-api', meta['minSdk'], '--lib', jar,
          '--output', out / 'dex', *sorted((out / 'classes').rglob('*.class'))])
     run([bt / ('aapt2' + suffix), 'compile', '--dir', ROOT / 'android/res', '-o', out / 'resources.zip'])
+    # (the compiled resources as a link input: -R would treat them as an overlay, which rejects new resources)
     run([bt / ('aapt2' + suffix), 'link', '-I', jar, '--manifest', out / 'AndroidManifest.xml',
-         '-R', out / 'resources.zip', '-A', out / 'assets', '-o', out / 'unsigned.apk'])
+         out / 'resources.zip', '-A', out / 'assets', '-o', out / 'unsigned.apk'])
     with zipfile.ZipFile(out / 'unsigned.apk', 'a') as archive:
         archive.write(out / 'dex/classes.dex', 'classes.dex')
     run([bt / ('zipalign' + suffix), '-f', '4', out / 'unsigned.apk', out / 'aligned.apk'])

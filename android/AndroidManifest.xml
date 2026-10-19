@@ -8,11 +8,17 @@
     <intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent>
     <intent><action android:name="android.intent.action.VIEW"/><data android:scheme="content"/></intent>
     <intent><action android:name="android.settings.SETTINGS"/></intent>
+    <intent><action android:name="android.settings.ACCESSIBILITY_SETTINGS"/></intent>
   </queries>
   <application android:label="Maré Launcher" android:icon="@drawable/icon" android:banner="@drawable/banner" android:theme="@android:style/Theme.Material.NoActionBar" android:hardwareAccelerated="true" android:allowBackup="false" android:debuggable="false" android:usesCleartextTraffic="false">
     <activity android:name=".LauncherActivity" android:exported="true" android:enableOnBackInvokedCallback="true" android:launchMode="singleTask" android:screenOrientation="landscape" android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|uiMode">
       <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LEANBACK_LAUNCHER"/></intent-filter>
       <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.HOME"/><category android:name="android.intent.category.DEFAULT"/></intent-filter>
     </activity>
+    <!-- Remote buttons (Settings › Remote buttons): off until the person turns it on in Android's accessibility settings. -->
+    <service android:name=".RemoteButtons" android:exported="true" android:label="@string/remote_buttons" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+      <intent-filter><action android:name="android.accessibilityservice.AccessibilityService"/></intent-filter>
+      <meta-data android:name="android.accessibilityservice" android:resource="@xml/remote_buttons"/>
+    </service>
   </application>
 </manifest>
