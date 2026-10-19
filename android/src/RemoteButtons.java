@@ -26,11 +26,12 @@ public class RemoteButtons extends AccessibilityService {
         if (!assignable(code)) return false;
         boolean first = event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0;
         Listener waiting = listener;
-        if (waiting != null) { if (first) waiting.pressed(code, name(code)); return true; }
+        if (waiting != null) { if (first) { android.util.Log.i("MareRemote", "pressed " + code + " to assign"); waiting.pressed(code, name(code)); } return true; }
         String target = prefs == null ? null : assigned(prefs).optString(String.valueOf(code), null);
         if (target == null) return false;
         // the press, its repeats and its release are the button's: nothing else on the TV acts on them
         if (first) {
+            android.util.Log.i("MareRemote", "button " + code + " opens " + target);
             Intent intent = Targets.intent(this, target);
             if (intent != null) try { startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); } catch (Exception ignored) {}
         }
