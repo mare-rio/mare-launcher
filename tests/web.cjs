@@ -17,7 +17,11 @@ fs.mkdirSync(path.resolve(__dirname,'../.evidence'),{recursive:true});
    window.testData=fixture;window.actions=[];
    window.TV={catalog:()=>JSON.stringify(testData),preferences:()=>localStorage.getItem('test-prefs')||JSON.stringify({favorites:fixture.apps.slice(0,8).map(a=>a.package),motion:true,theme:'night'}),
      save:(k,v)=>{const p=JSON.parse(TV.preferences());p[k]=k==='favorites'?JSON.parse(v):k==='motion'?v==='true':v;localStorage.setItem('test-prefs',JSON.stringify(p));},
-     network:()=>'Wi-Fi connected',version:()=>'0.3.0',launch:p=>actions.push(['launch',p]),input:p=>actions.push(['input',p]),settings:p=>actions.push(['settings',p]),appInfo:p=>actions.push(['info',p]),exit:()=>actions.push(['exit'])};
+     network:()=>'Wi-Fi connected',version:()=>'0.3.0',launch:p=>actions.push(['launch',p]),input:p=>actions.push(['input',p]),settings:p=>actions.push(['settings',p]),appInfo:p=>actions.push(['info',p]),exit:()=>actions.push(['exit']),
+     buttons:()=>JSON.stringify(window.testButtons||{on:false,assigned:{}}),
+     assign:(c,t)=>{const b=JSON.parse(TV.buttons());b.assigned[c]={target:t,name:'button '+c};window.testButtons=b;},
+     unassign:c=>{const b=JSON.parse(TV.buttons());delete b.assigned[c];window.testButtons=b;},
+     listen:()=>actions.push(['listen']),stopListening:()=>actions.push(['stopListening'])};
  },{fixture});
  await page.goto(pathToFileURL(path.resolve(__dirname,'../.build/web/index.html')).href);
  await page.evaluate(()=>document.fonts.ready);await page.waitForTimeout(450);
@@ -77,6 +81,27 @@ fs.mkdirSync(path.resolve(__dirname,'../.evidence'),{recursive:true});
  await key('ArrowRight');assert.equal(await page.locator('canvas[data-mark]').count(),1);
  await page.emulateMedia({reducedMotion:'reduce'});await page.waitForFunction(()=>!document.querySelector('canvas[data-mark]'));assert.equal(await page.locator('canvas[data-mark]').count(),0);assert.equal((await prefs()).motion,true);await page.emulateMedia({reducedMotion:'no-preference'});await page.waitForFunction(()=>!!document.querySelector('canvas[data-mark]'));
  await action('set:bluetooth');assert.deepEqual(await page.evaluate(()=>actions.at(-1)),['settings','bluetooth']);
+ // Remote buttons: off until Android's accessibility settings turn it on; a press is listened for, then the
+ // library (inputs first) chooses what it opens; ok on it again changes or removes it; Back cancels each step.
+ assert.match(await page.locator('[data-f="set:buttons"]').textContent(),/0 assigned · off · organise/);
+ await action('set:buttons');assert.equal(await page.locator('.tv-panel.open h2').textContent(),'Remote buttons');
+ await action('btn:enable');assert.deepEqual(await page.evaluate(()=>actions.at(-1)),['settings','accessibility']);
+ await action('btn:add');assert.deepEqual(await page.evaluate(()=>actions.at(-1)),['listen']);assert.match(await page.locator('[data-f="btn:add"]').textContent(),/Press the remote button/);
+ await key('Escape');assert.deepEqual(await page.evaluate(()=>actions.at(-1)),['stopListening']);assert.equal(await page.locator('.tv-panel.open h2').textContent(),'Remote buttons');
+ await action('btn:add');await page.evaluate(()=>buttonPressed(4065,'button 4065'));
+ assert.equal(await page.locator('.tv-panel.open h2').textContent(),'Assign button 4065');assert.equal(await id(),'lib:input:hdmi1');
+ const choices=await page.locator('.tv-library [data-f]').evaluateAll(e=>e.map(x=>x.dataset.f));assert.deepEqual(choices.slice(0,3),['lib:input:hdmi1','lib:input:hdmi2','lib:input:hdmi3']);assert.ok(!choices.includes('lib:input:tuner'));
+ await snap('assign');
+ await action('lib:org.smarttube.stable');assert.equal(await page.locator('.tv-panel.open h2').textContent(),'Remote buttons');assert.equal(await id(),'btn:4065');
+ assert.deepEqual((await page.evaluate(()=>JSON.parse(TV.buttons()))).assigned['4065'].target,'app:org.smarttube.stable');
+ assert.match(await page.locator('[data-f="btn:4065"]').textContent(),/SmartTube.*button 4065/);assert.equal(await page.locator('.toast .tk').textContent(),'assigned');
+ await page.evaluate(()=>{testButtons.on=true;refreshTV();});assert.equal(await page.locator('[data-f="btn:enable"]').count(),0);
+ await action('btn:add');await page.evaluate(()=>buttonPressed(4020,'button 4020'));await action('lib:input:hdmi1');
+ assert.match(await page.locator('[data-f="btn:4020"]').textContent(),/Console.*button 4020/);await snap('buttons');
+ await action('btn:4065');assert.equal(await id(),'lib:remove');await hold();assert.equal(await menuOpen(),0);
+ await action('lib:remove');assert.equal((await page.evaluate(()=>JSON.parse(TV.buttons()))).assigned['4065'],undefined);assert.equal(await page.locator('.toast .tk').textContent(),'cleared');
+ await action('btn:4020');await key('Escape');assert.equal(await id(),'btn:4020');await key('Escape');assert.equal(await page.locator('.tv-panel.open').count(),0);
+ await pane('settings');assert.match(await page.locator('[data-f="set:buttons"]').textContent(),/1 assigned · organise/);
  await home();await snap('home-day');
  await page.reload();await page.waitForTimeout(100);assert.equal(await page.locator('html').getAttribute('data-theme'),'day');assert.equal(await page.locator('.mare-app').count(),12);
  // Home resets all layers. A cancelled/held press outside an app must never launch.
@@ -100,7 +125,7 @@ fs.mkdirSync(path.resolve(__dirname,'../.evidence'),{recursive:true});
  }
  await page.setViewportSize({width:960,height:540});
  assert.deepEqual(errors,[]);
- fs.writeFileSync(path.resolve(__dirname,'../.evidence/browser-verification.json'),JSON.stringify({verifiedAt:new Date().toISOString(),geometry,tests:'geometry, international date, D-pad, 450ms hold and suppression, menu bounds and Back, reorder, column-major 64-app scrolling, 12/13 cap, source, settings, reduced motion, preference reload, Home, empty inputs, first run',errors},null,2)+'\n',{mode:0o600});
- console.log('PASS: redesign geometry and remote/state acceptance, 64-app stress catalog, 12-place limit, first run, persistence, reduced motion; no JS errors.');
+ fs.writeFileSync(path.resolve(__dirname,'../.evidence/browser-verification.json'),JSON.stringify({verifiedAt:new Date().toISOString(),geometry,tests:'geometry, international date, D-pad, 450ms hold and suppression, menu bounds and Back, reorder, column-major 64-app scrolling, 12/13 cap, source, settings, remote buttons, reduced motion, preference reload, Home, empty inputs, first run',errors},null,2)+'\n',{mode:0o600});
+ console.log('PASS: redesign geometry and remote/state acceptance, 64-app stress catalog, 12-place limit, first run, persistence, reduced motion, remote buttons; no JS errors.');
  } finally {await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0 — 19 October 2026
+
+- Remote buttons: Settings › Remote buttons assigns a remote button to an app or a TV input, which it then opens from anywhere on the TV, the way its Home tile would. Choose Assign a button, press the button, then choose from the inputs and apps. Navigation, OK, Back, Home, volume and power can't be assigned, and every unassigned key stays the TV's. Android requires an accessibility service to see buttons before the TV acts on them: the launcher's asks for key events only, never the screen, and stays off until you turn it on in Android's accessibility settings (the pane links there).
+
 ## 0.4.1 — 6 October 2026
 
 - Inputs: a shorter footer, so the pin hint fits beside it on a 1080p TV.

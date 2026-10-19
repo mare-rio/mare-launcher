@@ -21,13 +21,22 @@
     save: (key,value) => {const p=JSON.parse(localStorage.getItem('preview-prefs')||'{}');p[key]=key==='favorites'?JSON.parse(value):key==='motion'?value==='true':value;localStorage.setItem('preview-prefs',JSON.stringify(p));},
     network: () => 'Browser preview', version: () => '0.3.0',
     launch:p=>window.lastAction=['launch',p], input:p=>window.lastAction=['input',p], appInfo:p=>window.lastAction=['appInfo',p],
-    settings:p=>window.lastAction=['settings',p], exit:()=>window.lastAction=['exit']
+    settings:p=>window.lastAction=['settings',p], exit:()=>window.lastAction=['exit'],
+    buttons:()=>localStorage.getItem('preview-buttons')||'{"on":false,"assigned":{}}',
+    assign:(c,t)=>{const b=JSON.parse(bridge.buttons());b.assigned[c]={target:t,name:'button '+c};localStorage.setItem('preview-buttons',JSON.stringify(b));},
+    unassign:c=>{const b=JSON.parse(bridge.buttons());delete b.assigned[c];localStorage.setItem('preview-buttons',JSON.stringify(b));},
+    listen:()=>window.lastAction=['listen'], stopListening:()=>window.lastAction=['stopListening']
   };
   let data=JSON.parse(bridge.catalog()), pref=JSON.parse(bridge.preferences());
   // A favourite is an app's package, or a TV input as "input:<id>" (an HDMI device pinned to Home).
   const inputOf=p=>typeof p==='string'&&p.startsWith('input:')?data.inputs.find(i=>'input:'+i.id===p):undefined;
   const clean = list => [...new Set(list)].filter(p=>inputOf(p)||data.apps.some(a=>a.package===p)).slice(0,LIMIT);
   let favorites=clean(pref.favorites||[]), theme=pref.theme==='day'?'day':'night', motion=pref.motion!==false;
+  // Remote buttons: whether Android has the service on, and each assigned key code's name and target. While
+  // listening, the next remote button pressed comes back through window.buttonPressed; assigning is that button
+  // while the library chooses what it opens.
+  const readButtons=()=>{try{return JSON.parse(bridge.buttons());}catch(e){return {on:false,assigned:{}};}};
+  let buttons=readButtons(), listening=false, assigning=null;
   let pane=null, paneView='apps', paneReturn=null, menu=null, menuView=null, menuReturn=null;
   let focusId=null, libScroll=0, toast=null, toastTimer, held=null;
   const reduced=matchMedia('(prefers-reduced-motion: reduce)');
@@ -36,6 +45,14 @@
   const purpose=a=>(names[a.package]||[null,a.tv?'TV app':'Android app'])[1];
   const sorted=()=>data.apps.slice().sort((a,b)=>appName(a).localeCompare(appName(b),'en-GB'));
   const app=p=>data.apps.find(a=>a.package===p);
+  const libraryItems=()=>assigning?[
+    ...(buttons.assigned[assigning.code]?[{package:'remove',name:'Remove this button'}]:[]),
+    ...data.inputs.filter(i=>i.type!==0).map(i=>({package:'input:'+i.id,name:i.name})),...sorted()]:sorted();
+  // What a button opens, by the name its tile would show.
+  const targetName=t=>{
+    if(t.startsWith('input:')){const i=data.inputs.find(i=>i.id===t.slice(6));return i?i.name:null;}
+    const a=app(t.slice(4));return a?appName(a):null;
+  };
   // What a favourite or menu key names: an app, or an input shown with the TV's own name for it.
   const entry=p=>{const i=inputOf(p);return i?{package:p,name:i.name,input:i}:app(p);};
   const entryName=e=>e.input?e.input.name:appName(e);
@@ -65,7 +82,7 @@
     const e=list.find(e=>e.dataset.f===id)||list.find(e=>e.dataset.f===homeFirst())||list[0];
     focusId=e?.dataset.f||null;
     if(focusId?.startsWith('lib:')) {
-      const rows=Math.ceil(data.apps.length/4), index=sorted().findIndex(a=>'lib:'+a.package===focusId), row=index%rows;
+      const items=libraryItems(), rows=Math.ceil(items.length/4), index=items.findIndex(a=>'lib:'+a.package===focusId), row=index%rows;
       libScroll=Math.min(libScroll,row);if(row>=libScroll+LIB_ROWS)libScroll=row-LIB_ROWS+1;
       document.querySelector('.tv-library').style.transform=`translateY(${-libScroll*35}px)`;
     }
@@ -77,7 +94,18 @@
   function openPane(next){
     cancelHold();if(!pane)paneReturn=menu?menuReturn:focusId;menu=null;pane=paneView=next;libScroll=0;render();focus();
   }
-  function closePane(){cancelHold();menu=null;pane=null;render();focus(paneReturn);}
+  function closePane(){cancelHold();stopListening();assigning=null;menu=null;pane=null;render();focus(paneReturn);}
+  function stopListening(){if(listening){listening=false;bridge.stopListening();render();focus(focusId);}}
+  // A button pressed (or chosen again): the library, with the inputs first, chooses what it opens.
+  function chooseFor(code,name){assigning={code:String(code),name:name||'button '+code};paneView='apps';libScroll=0;render();focus();}
+  function assignTo(target){
+    const {code,name}=assigning, remove=target==='remove', full=target.startsWith('input:')?target:'app:'+target;
+    if(remove)bridge.unassign(code);else bridge.assign(code,full);
+    buttons=readButtons();assigning=null;paneView='buttons';render();focus('btn:'+code);
+    notify(remove?`${name} · back to what the TV does`:`${name} · ${targetName(full)}`,remove?'cleared':'assigned');
+  }
+  window.buttonPressed=(code,name)=>{if(!listening)return;listening=false;chooseFor(code,name);};
+  window.stopListening=stopListening;
   function openMenu(pkg){
     if(!entry(pkg))return;cancelHold();menuReturn=focusId;menu=menuView=pkg;render();placeMenu();focus('mi:open');
   }
@@ -101,10 +129,15 @@
   function activate(id){
     if(!id)return;
     if(id.startsWith('app:input:'))return bridge.input(id.slice(10));
+    if(id.startsWith('lib:')&&assigning)return assignTo(id.slice(4));
     if(id.startsWith('app:')||id.startsWith('lib:'))return bridge.launch(id.slice(4));
+    if(id==='btn:enable')return bridge.settings('accessibility');
+    if(id==='btn:add'){listening=true;bridge.listen();render();return focus('btn:add');}
+    if(id.startsWith('btn:'))return chooseFor(id.slice(4),buttons.assigned[id.slice(4)]?.name);
     if(id.startsWith('input:'))return bridge.input(id.slice(6));
     if(id.startsWith('nav:'))return openPane(id.slice(4));
     if(id==='first:run'||id==='set:favourites')return openPane('apps');
+    if(id==='set:buttons')return openPane('buttons');
     if(id==='set:appearance')return changeTheme(theme==='night'?'day':'night');
     if(id==='set:motion')return changeMotion(!motion);
     if(id.startsWith('set:'))return bridge.settings(id.slice(4));
@@ -155,7 +188,7 @@
       const press={id:focusId,long:false};held=press;
       press.timer=setTimeout(()=>{
         if(held!==press)return;press.long=true;
-        if(menu)closeMenu();else if(press.id?.startsWith('app:')||press.id?.startsWith('lib:'))openMenu(press.id.slice(4));
+        if(menu)closeMenu();else if(press.id?.startsWith('app:')||(press.id?.startsWith('lib:')&&!assigning))openMenu(press.id.slice(4));
         else if(press.id?.startsWith('input:'))openMenu(press.id);
         // Preserve the consumed press after opening/closing a menu until key-up.
         held=press;
@@ -166,17 +199,21 @@
     }
     cancelHold();
     if(['left','right','up','down'].includes(key))navigate(key);
-    else if(key==='back'){if(menu)closeMenu();else if(pane)closePane();else bridge.exit();}
-    else if(key==='menu'){if(menu)closeMenu();else if(focusId?.startsWith('app:')||focusId?.startsWith('lib:'))openMenu(focusId.slice(4));else if(focusId?.startsWith('input:'))openMenu(focusId);else openPane('apps');}
+    else if(key==='back'){
+      if(menu)closeMenu();else if(listening)stopListening();
+      else if(assigning){const code=assigning.code;assigning=null;paneView='buttons';render();focus(buttons.assigned[code]?'btn:'+code:'btn:add');}
+      else if(pane)closePane();else bridge.exit();
+    }
+    else if(key==='menu'){if(menu)closeMenu();else if(assigning||listening)return;else if(focusId?.startsWith('app:')||focusId?.startsWith('lib:'))openMenu(focusId.slice(4));else if(focusId?.startsWith('input:'))openMenu(focusId);else openPane('apps');}
     else if(key==='source'){if(pane==='inputs')closePane();else openPane('inputs');}
     else if(key==='home')window.launcherHome();
   };
   window.launcherHome=()=>{cancelHold();menu=null;pane=null;libScroll=0;render();focus(homeFirst());};
   window.refreshTV=()=>{
-    cancelHold();data=JSON.parse(bridge.catalog());pref=JSON.parse(bridge.preferences());favorites=clean(pref.favorites||favorites);
+    cancelHold();data=JSON.parse(bridge.catalog());pref=JSON.parse(bridge.preferences());favorites=clean(pref.favorites||favorites);buttons=readButtons();
     theme=pref.theme==='day'?'day':'night';motion=pref.motion!==false;
     if(menu&&!entry(menu))menu=null;
-    libScroll=Math.max(0,Math.min(libScroll,Math.ceil(data.apps.length/4)-LIB_ROWS));render();focus(focusId);
+    libScroll=Math.max(0,Math.min(libScroll,Math.ceil(libraryItems().length/4)-LIB_ROWS));render();focus(focusId);
   };
   const keys={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down',Enter:'enter',Escape:'back',ContextMenu:'menu',TVInput:'source',F2:'source'};
   document.addEventListener('keydown',e=>{const key=keys[e.key];if(key){e.preventDefault();if(!e.repeat||key.match(/^(left|right|up|down)$/))window.remoteKey(key);}});
@@ -193,13 +230,23 @@
   function row(id,children,extra={}){return h('li',{key:id,className:'tv-row',tabIndex:-1,role:'button','data-f':id,...extra},children);}
   function panelContent(){
     if(paneView==='apps'){
-      return h('div',{className:'tv-library-clip'},h('ul',{className:'tv-library','data-layer':'library',style:{'--rows':Math.max(1,Math.ceil(data.apps.length/4)),transform:`translateY(${-libScroll*35}px)`}},indicator(),...sorted().map(a=>row('lib:'+a.package,[h('span',{key:'name',className:'tv-row-name'},appName(a)),h('span',{key:'pin',className:'tv-pin','aria-label':favorites.includes(a.package)?'On home':undefined})],{className:'tv-row'+(favorites.includes(a.package)?' pinned':''),'aria-label':appName(a)+(favorites.includes(a.package)?', on home':'')})),!data.apps.length?h('li',{className:'tv-panel-empty'},'No apps available'):null));
+      const current=assigning&&buttons.assigned[assigning.code]?.target;
+      const marked=a=>assigning?current===(a.package.startsWith('input:')?a.package:'app:'+a.package):favorites.includes(a.package);
+      const items=libraryItems();
+      return h('div',{className:'tv-library-clip'},h('ul',{className:'tv-library','data-layer':'library',style:{'--rows':Math.max(1,Math.ceil(items.length/4)),transform:`translateY(${-libScroll*35}px)`}},indicator(),...items.map(a=>row('lib:'+a.package,[h('span',{key:'name',className:'tv-row-name'},appName(a)),h('span',{key:'pin',className:'tv-pin','aria-label':marked(a)?(assigning?'Assigned':'On home'):undefined})],{className:'tv-row'+(marked(a)?' pinned':''),'aria-label':appName(a)+(marked(a)?(assigning?', assigned':', on home'):'')})),!items.length?h('li',{className:'tv-panel-empty'},'No apps available'):null));
     }
     if(paneView==='inputs')return h('ul',{className:'tv-rows tv-inputs','data-layer':'inputs'},indicator(),...data.inputs.slice().sort((a,b)=>b.type-a.type||a.id.localeCompare(b.id)).map(input=>{
       const state=input.type===0?'tuner':input.state===0?'connected':input.state===1?'standby':'not connected';
       const prefix=input.label&&input.label!==input.name?input.label.toLowerCase()+' · ':'';
       return row('input:'+input.id,[h('span',{key:'name',className:'tv-row-name'},input.name),h('span',{key:'state',className:'tv-row-value'},prefix+state)],{className:'tv-row'+(input.type!==0&&input.state===2?' disconnected':input.state===0?' connected':'')});
     }),!data.inputs.length?h('li',{className:'tv-panel-empty'},data.inputError||'No inputs available · open TV settings'):null);
+    if(paneView==='buttons'){
+      const assigned=Object.entries(buttons.assigned).sort((a,b)=>(targetName(a[1].target)||'~').localeCompare(targetName(b[1].target)||'~','en-GB'));
+      return h('ul',{className:'tv-rows tv-inputs tv-buttons','data-layer':'buttons'},indicator(),
+        !buttons.on?row('btn:enable',[h('span',{key:'name',className:'tv-row-name'},'Turn on remote buttons'),h('span',{key:'value',className:'tv-row-value'},'android accessibility ↗')],{className:'tv-row connected'}):null,
+        row('btn:add',[h('span',{key:'name',className:'tv-row-name'},listening?'Press the remote button':'Assign a button'),h('span',{key:'value',className:'tv-row-value'},listening?'listening · back cancels':'press it, then choose')],{className:'tv-row'+(listening?' connected':'')}),
+        ...assigned.map(([code,b])=>{const name=targetName(b.target);return row('btn:'+code,[h('span',{key:'name',className:'tv-row-name'},name||'Not on this TV'),h('span',{key:'value',className:'tv-row-value'},b.name)],{className:'tv-row'+(name?'':' disconnected')});}));
+    }
     const setting=(id,label,value)=>row('set:'+id,[h('span',{key:'name',className:'tv-row-label'},label),value],{role:['appearance','motion'].includes(id)?'group':'button','aria-label':label});
     return h('ul',{className:'tv-rows tv-settings','data-layer':'settings'},indicator(),
       setting('appearance','Appearance',h('div',{key:'value',className:'seg','aria-label':'Appearance'},...['night','day'].map(t=>h('button',{key:t,tabIndex:-1,'data-theme-choice':t,className:theme===t?'on':'','aria-pressed':theme===t},t)))),
@@ -207,7 +254,8 @@
       setting('network','Network',h('span',{key:'value',className:'tv-row-value'},network()+' ↗')),
       setting('bluetooth','Bluetooth',h('span',{key:'value',className:'tv-row-value'},'remotes & accessories ↗')),
       setting('tv','TV settings',h('span',{key:'value',className:'tv-row-value'},'picture · sound · system ↗')),
-      setting('favourites','Favourites',h('span',{key:'value',className:'tv-row-value'},`${favorites.length} of 12 on home · organise`)));
+      setting('favourites','Favourites',h('span',{key:'value',className:'tv-row-value'},`${favorites.length} of 12 on home · organise`)),
+      setting('buttons','Remote buttons',h('span',{key:'value',className:'tv-row-value'},`${Object.keys(buttons.assigned).length} assigned${buttons.on?'':' · off'} · organise`)));
   }
   function menuContent(){
     const a=entry(menuView);if(!a)return null;const i=favorites.indexOf(a.package);
@@ -223,11 +271,12 @@
     document.documentElement.classList.toggle('tv-still',!!still);document.body.classList.toggle('tv-still',!!still);
     document.body.classList.toggle('tv-dialog-open',!!pane);
     const now=new Date(), time=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:false}),date=now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
-    const titles={apps:'Apps',inputs:'Inputs',settings:'Settings'};
+    const titles={apps:assigning?'Assign '+assigning.name:'Apps',inputs:'Inputs',settings:'Settings',buttons:'Remote buttons'};
     const inputMeta=[data.inputs.filter(i=>i.type===1007).length+' hdmi',...(data.inputs.some(i=>i.type===1001)?['av']:[]),...(data.inputs.some(i=>i.type===0)?['tuner']:[])].join(' · ');
-    const meta=paneView==='apps'?`${data.apps.length} apps · a–z`:paneView==='inputs'?inputMeta:'appearance · motion · connections';
-    const footLeft=paneView==='apps'?`${favorites.length} of 12 on home`:paneView==='inputs'?'input key depends on the TV':`maré launcher ${bridge.version?bridge.version():'0.3.0'}`;
-    const footRight=paneView==='apps'?'ok opens · hold ok to pin · back closes':paneView==='inputs'?'ok switches · hold ok to pin · back closes':'left / right changes · back closes';
+    const assignedCount=Object.keys(buttons.assigned).length;
+    const meta=paneView==='apps'?(assigning?'inputs · apps a–z':`${data.apps.length} apps · a–z`):paneView==='inputs'?inputMeta:paneView==='buttons'?`${assignedCount} assigned · ${buttons.on?'on':'off'}`:'appearance · motion · connections';
+    const footLeft=paneView==='apps'?(assigning?'opens from anywhere on the tv':`${favorites.length} of 12 on home`):paneView==='inputs'?'input key depends on the TV':paneView==='buttons'?'other keys stay the tv’s':`maré launcher ${bridge.version?bridge.version():'0.3.0'}`;
+    const footRight=paneView==='apps'?(assigning?'ok assigns · back cancels':'ok opens · hold ok to pin · back closes'):paneView==='inputs'?'ok switches · hold ok to pin · back closes':paneView==='buttons'?(listening?'press a remote button · back cancels':'ok chooses · back closes'):'left / right changes · back closes';
     ReactDOM.flushSync(()=>root.render(h(Mare.Page,{variant:'arrival'},
       h('div',{className:'tv-home','data-scope':'home','aria-hidden':!!pane||!!menu},
         h(Mare.TopBar,null,h(Mare.Wordmark,{href:'#home'}),h(Mare.Nav,null,...['apps','inputs','settings'].map(p=>h(Mare.NavItem,{key:p,href:'nav:'+p,current:pane===p},p)),h('span',{className:'tv-focus underline','aria-hidden':true}))),
