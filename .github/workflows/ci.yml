@@ -1,9 +1,10 @@
 name: Checks
 
+# A pull request is checked once it is ready for review; a draft runs nothing. Nothing runs
+# again on `main`: what merged was checked as a pull request.
 on:
   pull_request:
-  push:
-    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
@@ -15,6 +16,7 @@ concurrency:
 
 jobs:
   tests:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     strategy:
       fail-fast: false
       matrix:
@@ -37,6 +39,7 @@ jobs:
       - run: npm run build:web
       - run: npm run test:web
   android:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

@@ -8,5 +8,6 @@
 - Guided setup runs in the terminal, with readable panels and prompts like DanCLI. Do not add an HTML entry point.
 - Keep all files owned by explicitly named Maré Rio members, verified against current organisation membership. Main requires member authorship or code-owner approval, stale-review dismissal and CI, without bypass actors.
 - Run installer tests, browser acceptance and a production Android build for relevant changes. Record the limits of hardware validation.
+- A pull request is checked once it is ready for review; a draft runs nothing, and nothing runs again on `main`.
 - Public CI runs without secrets on GitHub-hosted runners, with a read-only token and pinned actions. Builds are signed with the public key in `signing/` (it protects nothing: installing needs ADB on the TV's network). Do not add publishing automation or privileged PR triggers.
 - Never commit device evidence, IP addresses, credentials or private workspace files. The signing key in `signing/` is public by design.
